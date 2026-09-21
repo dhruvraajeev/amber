@@ -1,0 +1,32 @@
+{
+  "name": "Agent (self-hosted LLM)",
+  "version": 1,
+  "nodes": [
+    { "id": "n_users", "kind": "users", "label": "Users", "position": { "x": 0, "y": 150 },
+      "params": { "traffic": { "type": "constant", "rps": 1 }, "clientTimeoutMs": 120000 } },
+    { "id": "n_api", "kind": "service", "label": "Agent API", "position": { "x": 220, "y": 150 },
+      "params": { "replicas": 2, "concurrencyPerReplica": 50, "queueLimit": 200,
+                  "work": { "p50Ms": 10, "p99Ms": 60 }, "costPerReplicaMonth": 30 } },
+    { "id": "n_agent", "kind": "agent", "label": "Agent", "position": { "x": 440, "y": 150 },
+      "params": { "llmCallsMean": 4, "toolCallsPerStep": 1, "toolLatency": { "p50Ms": 200, "p99Ms": 1500 },
+                  "basePromptTokens": 800, "contextGrowthTokensPerStep": 300, "outputTokensPerCall": 150 } },
+    { "id": "n_llm", "kind": "llm", "label": "Llama 3.1 8B on L4", "position": { "x": 680, "y": 60 },
+      "params": { "mode": "selfHosted", "gpuPresetId": "nvidia-l4-24gb",
+                  "modelPresetId": "llama-3.1-8b-instruct-fp16", "profileId": "default",
+                  "replicas": 1, "maxBatchSize": 32, "maxBatchTokens": 4096, "maxOutputTokensReserve": 512,
+                  "speculative": { "enabled": false, "draftTokens": 4, "acceptanceRate": 0.7, "draftStepMs": 3 } } },
+    { "id": "n_tools", "kind": "service", "label": "Tool service", "position": { "x": 680, "y": 240 },
+      "params": { "replicas": 1, "concurrencyPerReplica": 20, "queueLimit": 100,
+                  "work": { "p50Ms": 150, "p99Ms": 1200 }, "costPerReplicaMonth": 15 } },
+    { "id": "n_vec", "kind": "database", "label": "Vector DB", "position": { "x": 900, "y": 240 },
+      "params": { "preset": "vector", "connectionPool": 20, "queueLimit": 100,
+                  "query": { "p50Ms": 15, "p99Ms": 80 }, "costPerMonth": 70 } }
+  ],
+  "edges": [
+    { "id": "e_users_api", "source": "n_users", "target": "n_api" },
+    { "id": "e_api_agent", "source": "n_api", "target": "n_agent" },
+    { "id": "e_agent_llm", "source": "n_agent", "target": "n_llm", "role": "llm" },
+    { "id": "e_agent_tools", "source": "n_agent", "target": "n_tools", "role": "tool" },
+    { "id": "e_tools_vec", "source": "n_tools", "target": "n_vec" }
+  ]
+}

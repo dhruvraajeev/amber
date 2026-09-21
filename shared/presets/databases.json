@@ -1,0 +1,11 @@
+[
+  { "id": "postgres-small", "name": "Postgres (managed, small)", "preset": "postgres",
+    "connectionPool": 50, "queueLimit": 200, "query": { "p50Ms": 4, "p99Ms": 25 }, "costPerMonth": 60,
+    "verifiedAt": null, "note": "verify price" },
+  { "id": "mongodb-small", "name": "MongoDB (managed, small)", "preset": "mongodb",
+    "connectionPool": 100, "queueLimit": 200, "query": { "p50Ms": 3, "p99Ms": 20 }, "costPerMonth": 57,
+    "verifiedAt": null, "note": "verify price" },
+  { "id": "vector-small", "name": "Vector database (small)", "preset": "vector",
+    "connectionPool": 20, "queueLimit": 100, "query": { "p50Ms": 15, "p99Ms": 80 }, "costPerMonth": 70,
+    "verifiedAt": null, "note": "verify price" }
+]

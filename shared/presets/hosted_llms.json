@@ -1,0 +1,10 @@
+[
+  { "id": "nim-example", "name": "NVIDIA NIM (example model)", "ttft": { "p50Ms": 400, "p99Ms": 1500 },
+    "tokensPerSecond": { "p50": 60, "p99Low": 20 }, "inputUsdPer1M": 0, "outputUsdPer1M": 0,
+    "rateLimitRpm": 40, "defaultPromptTokens": 512, "defaultOutputTokens": 256,
+    "verifiedAt": null, "note": "replace with calibrated values in phase 3" },
+  { "id": "hosted-small-paid", "name": "Hosted small model (paid tier)", "ttft": { "p50Ms": 350, "p99Ms": 1200 },
+    "tokensPerSecond": { "p50": 90, "p99Low": 30 }, "inputUsdPer1M": 0.15, "outputUsdPer1M": 0.6,
+    "rateLimitRpm": 3000, "defaultPromptTokens": 512, "defaultOutputTokens": 256,
+    "verifiedAt": null, "note": "generic illustrative prices; verify against a real provider" }
+]

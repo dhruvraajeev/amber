@@ -1,0 +1,24 @@
+{
+  "name": "Classic web app",
+  "version": 1,
+  "nodes": [
+    { "id": "n_users", "kind": "users", "label": "Users", "position": { "x": 0, "y": 150 },
+      "params": { "traffic": { "type": "constant", "rps": 200 }, "clientTimeoutMs": 5000 } },
+    { "id": "n_lb", "kind": "loadBalancer", "label": "Load balancer", "position": { "x": 220, "y": 150 },
+      "params": { "algorithm": "roundRobin", "overhead": { "p50Ms": 1, "p99Ms": 3 } } },
+    { "id": "n_api", "kind": "service", "label": "API", "position": { "x": 440, "y": 150 },
+      "params": { "replicas": 4, "concurrencyPerReplica": 50, "queueLimit": 200,
+                  "work": { "p50Ms": 15, "p99Ms": 80 }, "costPerReplicaMonth": 30 } },
+    { "id": "n_cache", "kind": "cache", "label": "Redis cache", "position": { "x": 660, "y": 150 },
+      "params": { "hitRate": 0.8, "latency": { "p50Ms": 1, "p99Ms": 4 }, "costPerMonth": 25 } },
+    { "id": "n_db", "kind": "database", "label": "Postgres", "position": { "x": 880, "y": 150 },
+      "params": { "preset": "postgres", "connectionPool": 50, "queueLimit": 200,
+                  "query": { "p50Ms": 4, "p99Ms": 25 }, "costPerMonth": 60 } }
+  ],
+  "edges": [
+    { "id": "e_users_lb", "source": "n_users", "target": "n_lb" },
+    { "id": "e_lb_api", "source": "n_lb", "target": "n_api" },
+    { "id": "e_api_cache", "source": "n_api", "target": "n_cache" },
+    { "id": "e_cache_db", "source": "n_cache", "target": "n_db" }
+  ]
+}

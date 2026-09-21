@@ -1,0 +1,23 @@
+{
+  "name": "RAG chatbot (hosted LLM)",
+  "version": 1,
+  "nodes": [
+    { "id": "n_users", "kind": "users", "label": "Users", "position": { "x": 0, "y": 150 },
+      "params": { "traffic": { "type": "constant", "rps": 5 }, "clientTimeoutMs": 30000 } },
+    { "id": "n_api", "kind": "service", "label": "Chat API", "position": { "x": 240, "y": 150 },
+      "params": { "replicas": 2, "concurrencyPerReplica": 50, "queueLimit": 200,
+                  "work": { "p50Ms": 15, "p99Ms": 80 }, "costPerReplicaMonth": 30 } },
+    { "id": "n_vec", "kind": "database", "label": "Vector DB", "position": { "x": 500, "y": 60 },
+      "params": { "preset": "vector", "connectionPool": 20, "queueLimit": 100,
+                  "query": { "p50Ms": 15, "p99Ms": 80 }, "costPerMonth": 70 } },
+    { "id": "n_llm", "kind": "llm", "label": "Hosted LLM", "position": { "x": 500, "y": 240 },
+      "params": { "mode": "hosted", "presetId": "hosted-small-paid",
+                  "ttft": { "p50Ms": 350, "p99Ms": 1200 }, "tokensPerSecond": { "p50": 90, "p99Low": 30 },
+                  "inputUsdPer1M": 0.15, "outputUsdPer1M": 0.6, "rateLimitRpm": 3000, "maxRetries": 3 } }
+  ],
+  "edges": [
+    { "id": "e_users_api", "source": "n_users", "target": "n_api" },
+    { "id": "e_api_vec", "source": "n_api", "target": "n_vec" },
+    { "id": "e_api_llm", "source": "n_api", "target": "n_llm" }
+  ]
+}

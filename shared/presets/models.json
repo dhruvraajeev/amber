@@ -1,0 +1,11 @@
+[
+  { "id": "llama-3.1-8b-instruct-fp16", "name": "Llama 3.1 8B Instruct (FP16)",
+    "nLayers": 32, "nKvHeads": 8, "headDim": 128, "bytesPerElement": 2, "weightsGb": 16.1,
+    "defaultPromptTokens": 512, "defaultOutputTokens": 256, "verifiedAt": null, "note": "verify config values" },
+  { "id": "llama-3.1-8b-instruct-q4km", "name": "Llama 3.1 8B Instruct (Q4_K_M GGUF)",
+    "nLayers": 32, "nKvHeads": 8, "headDim": 128, "bytesPerElement": 2, "weightsGb": 4.9,
+    "defaultPromptTokens": 512, "defaultOutputTokens": 256, "verifiedAt": null, "note": "weights quantized, KV cache FP16; verify" },
+  { "id": "qwen2.5-7b-instruct-fp16", "name": "Qwen2.5 7B Instruct (FP16)",
+    "nLayers": 28, "nKvHeads": 4, "headDim": 128, "bytesPerElement": 2, "weightsGb": 15.2,
+    "defaultPromptTokens": 512, "defaultOutputTokens": 256, "verifiedAt": null, "note": "verify config values" }
+]

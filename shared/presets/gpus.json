@@ -1,0 +1,6 @@
+[
+  { "id": "nvidia-l4-24gb", "name": "NVIDIA L4", "memoryGb": 24, "usdPerHour": 0.8, "verifiedAt": null, "note": "approximate on-demand cloud price; verify" },
+  { "id": "nvidia-a10g-24gb", "name": "NVIDIA A10G", "memoryGb": 24, "usdPerHour": 1.0, "verifiedAt": null, "note": "approximate on-demand cloud price; verify" },
+  { "id": "nvidia-a100-80gb", "name": "NVIDIA A100 80GB", "memoryGb": 80, "usdPerHour": 3.7, "verifiedAt": null, "note": "approximate on-demand cloud price; verify" },
+  { "id": "nvidia-h100-80gb", "name": "NVIDIA H100 80GB", "memoryGb": 80, "usdPerHour": 6.9, "verifiedAt": null, "note": "approximate on-demand cloud price; verify" }
+]
