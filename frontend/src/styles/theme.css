@@ -1,0 +1,76 @@
+@import "tailwindcss";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+
+/* Plan §11.3 — the only colors the app may use. Warm only: no blue, cyan, purple, or neutral gray. */
+:root {
+  --bg: #16110d;
+  --panel: #211912;
+  --panel-2: #2c2118;
+  --border: #3f3024;
+  --grid: #2a2019;
+  --text: #f3e6d3;
+  --muted: #b09a80;
+  --accent: #f2a93b;
+  --accent-2: #d9772b;
+  --ok: #848c48; /* darker than plan's #A8B060 so ok/warn differ in greyscale — docs/decisions.md */
+  --warn: #e8913a;
+  --crit: #c8452f; /* ~3.9:1 on --bg: borders, glows, icons only, never body text */
+
+  /* Ordered chart series ramp */
+  --series-1: #f2a93b;
+  --series-2: #d9772b;
+  --series-3: #b5523b;
+  --series-4: #e6c07a;
+  --series-5: #8c5a3c;
+  --series-6: #a8b060;
+
+  color-scheme: dark;
+}
+
+/* Expose tokens as Tailwind utilities (bg-panel, text-muted, border-crit, ...).
+   Drop Tailwind's default palette so cool hues can't sneak in via bg-blue-500. */
+@theme inline {
+  --color-*: initial;
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-border: var(--border);
+  --color-grid: var(--grid);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-crit: var(--crit);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* All metrics: mono, tabular figures */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
