@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Canvas from './canvas/Canvas'
 import EmptyState from './layout/EmptyState'
 import TopBar from './layout/TopBar'
 import type { Design } from './types/contracts'
@@ -34,12 +35,9 @@ export default function App() {
         </select>
       </TopBar>
 
-      <div className="grid min-h-0 grid-cols-[9rem_minmax(0,1fr)_18rem]">
+      <div className="grid min-h-0 grid-cols-[10rem_minmax(0,1fr)_18rem]">
         {loaded ? (
-          <>
-            <aside className="border-r border-border bg-panel p-3 text-sm text-muted">Palette</aside>
-            <main className="min-h-0 bg-bg" />
-          </>
+          <Canvas key={loaded.key} design={loaded.design} />
         ) : (
           <main className="col-span-2 min-h-0 bg-bg">
             <EmptyState templates={templates} onPick={load} />
