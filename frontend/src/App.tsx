@@ -1,20 +1,61 @@
-// Placeholder shell; Step 4 replaces this with the router and §11.2 layout.
+import { useState } from 'react'
+import EmptyState from './layout/EmptyState'
+import TopBar from './layout/TopBar'
+import type { Design } from './types/contracts'
+
+const templates = Object.values(
+  import.meta.glob<Design>('@shared/templates/*.json', { eager: true, import: 'default' }),
+)
+
+// The editor page: layout regions per §11.2. The store (Step 6) will own `design`.
 export default function App() {
+  // `key` changes on every load so the canvas remounts with fresh nodes.
+  const [loaded, setLoaded] = useState<{ design: Design; key: number } | null>(null)
+  const load = (d: Design) => setLoaded({ design: structuredClone(d), key: Date.now() })
+
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-border bg-panel px-4 py-2">
-        <span className="font-semibold text-accent">◈ Amber</span>
-      </header>
-      <main className="grid flex-1 place-items-center">
-        <div className="rounded-lg border border-border bg-panel p-6 text-center">
-          <p className="text-muted">Canvas coming in Step 4.</p>
-          <p className="num mt-3 flex gap-4">
-            <span className="text-ok">● ok 42%</span>
-            <span className="text-warn">▲ warn 78%</span>
-            <span className="text-crit">■ crit 97%</span>
-          </p>
-        </div>
-      </main>
+    <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto_auto]">
+      <TopBar>
+        {loaded && <span className="truncate">{loaded.design.name}</span>}
+        <select
+          aria-label="Load a template"
+          value=""
+          onChange={(e) => load(templates[Number(e.target.value)])}
+          className="rounded border border-border bg-panel-2 px-2 py-1 text-sm"
+        >
+          <option value="" disabled>
+            Templates
+          </option>
+          {templates.map((t, i) => (
+            <option key={t.name} value={i}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      </TopBar>
+
+      <div className="grid min-h-0 grid-cols-[9rem_minmax(0,1fr)_18rem]">
+        {loaded ? (
+          <>
+            <aside className="border-r border-border bg-panel p-3 text-sm text-muted">Palette</aside>
+            <main className="min-h-0 bg-bg" />
+          </>
+        ) : (
+          <main className="col-span-2 min-h-0 bg-bg">
+            <EmptyState templates={templates} onPick={load} />
+          </main>
+        )}
+        <aside className="border-l border-border bg-panel p-3 text-sm text-muted">
+          Select a node to edit its parameters.
+        </aside>
+      </div>
+
+      <footer className="border-t border-border bg-panel px-4 py-2 text-sm text-muted">
+        Run controls appear here once a design is ready.
+      </footer>
+      <section className="h-32 border-t border-border bg-panel px-4 py-2 text-sm text-muted">
+        Run a simulation to see results.
+      </section>
     </div>
   )
 }
