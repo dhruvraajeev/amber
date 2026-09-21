@@ -1,0 +1,33 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Owner's local docs — kept in ../learnAmber, never committed
+IMPLEMENTATION_PLAN.md
+LEARNING_LOG.md
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Local artifacts
+result.json
+*.gguf
+calibration/models/
+calibration/raw/
