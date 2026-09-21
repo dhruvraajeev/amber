@@ -2,6 +2,8 @@
 - The spec is ../learnAmber/IMPLEMENTATION_PLAN.md (outside the repo; session handoffs go in
   ../learnAmber/LEARNING_LOG.md). Never commit either file. Contracts (§7) and the simulation model (§8) are law.
 - One step at a time from §18. Don't start the next step unless asked.
+- Git: work directly on `main`. No branches, no PRs, no merges. Make the step's commits (messages from
+  §18) and `git push origin main` when the step is done.
 - After each step: files changed, a 4–6 sentence plain-English explanation, verify commands.
 - Five pieces are "owner writes by hand" (Steps 10, 11, 16, 21, 28). Leave TODO stubs; review,
   don't rewrite.
