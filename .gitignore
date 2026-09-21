@@ -3,7 +3,8 @@
 .env.*
 !.env.example
 
-# Owner's local docs — kept in ../learnAmber, never committed
+# Owner's local docs — never committed (CLAUDE.md stays local in the repo folder)
+CLAUDE.md
 IMPLEMENTATION_PLAN.md
 LEARNING_LOG.md
 
