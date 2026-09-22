@@ -21,6 +21,8 @@ const nodeTypes = Object.fromEntries(
   (['users', 'loadBalancer', 'service', 'cache', 'database', 'agent', 'llm'] satisfies NodeKind[]).map((k) => [k, NodeCard]),
 )
 
+const GRID = 20
+
 // Renders two layout cells: the palette column and the React Flow pane.
 // Holds the graph locally for now; Step 6 moves it into the Zustand design slice.
 export default function Canvas({ design }: { design: Design }) {
@@ -45,7 +47,7 @@ function Flow({ design }: { design: Design }) {
       const nudge = (nodes.length % 5) * 24
       screen = { x: r.left + r.width / 2 - 70 + nudge, y: r.top + r.height / 2 - 25 + nudge }
     }
-    const node = { ...newNode(kind, screenToFlowPosition(screen), new Set(nodes.map((n) => n.id))), selected: true }
+    const node = { ...newNode(kind, screenToFlowPosition(screen, { snapToGrid: true }), new Set(nodes.map((n) => n.id))), selected: true } // added grid snap
     setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), node])
   }
 
@@ -68,7 +70,17 @@ function Flow({ design }: { design: Design }) {
   return (
     <>
       <Palette onAdd={add} />
-      <main ref={pane} className="min-h-0 bg-bg" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+      <main
+        ref={pane}
+        className="min-h-0 bg-bg"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={onDrop}
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape') return
+          setNodes((ns) => ns.map((n) => ({ ...n, selected: false })))
+          setEdges((es) => es.map((ed) => ({ ...ed, selected: false })))
+        }}
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -78,10 +90,12 @@ function Flow({ design }: { design: Design }) {
           onConnect={onConnect}
           isValidConnection={(c) => c.source !== c.target}
           deleteKeyCode={['Delete', 'Backspace']}
+          snapToGrid
+          snapGrid={[GRID, GRID]}
           colorMode="dark"
           fitView
         >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
+          <Background variant={BackgroundVariant.Dots} gap={GRID} size={1.5} />
           <Controls showInteractive={false} />
         </ReactFlow>
       </main>
