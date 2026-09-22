@@ -1,3 +1,4 @@
+import { BLANK } from '../canvas/map'
 import type { Design } from '../types/contracts'
 
 // Empty state (§11.3): three template cards and "Blank canvas".
@@ -21,7 +22,7 @@ export default function EmptyState({ templates, onPick }: { templates: Design[];
           ))}
         </div>
         <button
-          onClick={() => onPick({ name: 'Untitled design', version: 1, nodes: [], edges: [] })}
+          onClick={() => onPick(BLANK)}
           className="mt-4 text-accent hover:text-accent-2"
         >
           Blank canvas

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Canvas from './canvas/Canvas'
+import { BLANK } from './canvas/map'
 import EmptyState from './layout/EmptyState'
 import TopBar from './layout/TopBar'
 import type { Design } from './types/contracts'
@@ -21,7 +22,7 @@ export default function App() {
         <select
           aria-label="Load a template"
           value=""
-          onChange={(e) => load(templates[Number(e.target.value)])}
+          onChange={(e) => load(e.target.value === 'blank' ? BLANK : templates[Number(e.target.value)])}
           className="rounded border border-border bg-panel-2 px-2 py-1 text-sm"
         >
           <option value="" disabled>
@@ -32,6 +33,7 @@ export default function App() {
               {t.name}
             </option>
           ))}
+          <option value="blank">Blank canvas</option>
         </select>
       </TopBar>
 

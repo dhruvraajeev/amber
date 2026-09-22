@@ -2,6 +2,8 @@ import type { Edge, Node } from '@xyflow/react'
 import hostedLlms from '@shared/presets/hosted_llms.json'
 import type { Design, DesignEdge, DesignNode, NodeKind, NodeParamsByKind } from '../types/contracts'
 
+export const BLANK: Design = { name: 'Untitled design', version: 1, nodes: [], edges: [] }
+
 // Translation between the §7 Design contract and React Flow's node/edge shapes,
 // plus the canonical form used for `designHash`.
 

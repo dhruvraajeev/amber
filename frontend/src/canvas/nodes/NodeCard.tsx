@@ -33,9 +33,9 @@ function keyLine(d: NodeData): string {
     case 'loadBalancer':
       return d.params.algorithm === 'roundRobin' ? 'round robin' : 'least connections'
     case 'service':
-      return `${d.params.replicas} × ${d.params.concurrencyPerReplica} workers`
+      return `${d.params.replicas} × ${d.params.concurrencyPerReplica} · ${d.params.work.p50Ms} ms p50`
     case 'cache':
-      return `${Math.round(d.params.hitRate * 100)}% hit rate`
+      return `${Math.round(d.params.hitRate * 100)}% hit · $${d.params.costPerMonth}/mo`
     case 'database':
       return `${d.params.preset} · pool ${d.params.connectionPool}`
     case 'agent':
