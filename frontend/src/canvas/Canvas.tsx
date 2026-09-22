@@ -41,13 +41,20 @@ function Flow({ design }: { design: Design }) {
   const pane = useRef<HTMLDivElement>(null)
 
   const add = (kind: NodeKind, screen?: { x: number; y: number }) => {
-    if (!screen) {
-      // Palette click: middle of the pane, nudged per node so repeated clicks don't stack exactly.
+    let position
+    if (screen) {
+      // Dropped from the palette: wherever the mouse let go.
+      position = screenToFlowPosition(screen, { snapToGrid: true })
+    } else if (nodes.length > 0) {
+      // Clicked in the palette: to the right of the rightmost node, so clicks build a chain.
+      const last = nodes.reduce((a, b) => (b.position.x > a.position.x ? b : a))
+      position = { x: last.position.x + 220, y: last.position.y }
+    } else {
+      // First node on an empty canvas: the middle of the pane.
       const r = pane.current!.getBoundingClientRect()
-      const nudge = (nodes.length % 5) * 24
-      screen = { x: r.left + r.width / 2 - 70 + nudge, y: r.top + r.height / 2 - 25 + nudge }
+      position = screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, { snapToGrid: true })
     }
-    const node = { ...newNode(kind, screenToFlowPosition(screen, { snapToGrid: true }), new Set(nodes.map((n) => n.id))), selected: true } // added grid snap
+    const node = { ...newNode(kind, position, new Set(nodes.map((n) => n.id))), selected: true }
     setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), node])
   }
 
