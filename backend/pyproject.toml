@@ -3,7 +3,9 @@ name = "amber"
 version = "0.1.0"
 description = "Amber's simulator and API: a discrete-event model of web and AI systems."
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic>=2.13.5",
+]
 
 [dependency-groups]
 dev = [
