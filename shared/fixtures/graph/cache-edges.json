@@ -1,0 +1,81 @@
+{
+  "description": "Cache with no miss path.",
+  "expect": [
+    "CACHE_EDGES"
+  ],
+  "config": {
+    "durationS": 60,
+    "seed": 42,
+    "warmupS": 5
+  },
+  "design": {
+    "name": "cache-edges",
+    "version": 1,
+    "nodes": [
+      {
+        "id": "users",
+        "kind": "users",
+        "label": "users",
+        "position": {
+          "x": 200,
+          "y": 0
+        },
+        "params": {
+          "traffic": {
+            "type": "constant",
+            "rps": 50
+          },
+          "clientTimeoutMs": 5000
+        }
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "label": "api",
+        "position": {
+          "x": 400,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "cache",
+        "kind": "cache",
+        "label": "cache",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "params": {
+          "hitRate": 0.8,
+          "latency": {
+            "p50Ms": 1,
+            "p99Ms": 4
+          },
+          "costPerMonth": 25
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_users_api",
+        "source": "users",
+        "target": "api"
+      },
+      {
+        "id": "e_api_cache",
+        "source": "api",
+        "target": "cache"
+      }
+    ]
+  }
+}

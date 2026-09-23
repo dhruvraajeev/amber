@@ -1,0 +1,63 @@
+{
+  "description": "No Users node, so nothing is reachable either.",
+  "expect": [
+    "NO_USERS",
+    "UNREACHABLE"
+  ],
+  "config": {
+    "durationS": 60,
+    "seed": 42,
+    "warmupS": 5
+  },
+  "design": {
+    "name": "no-users",
+    "version": 1,
+    "nodes": [
+      {
+        "id": "api",
+        "kind": "service",
+        "label": "api",
+        "position": {
+          "x": 200,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "db",
+        "kind": "database",
+        "label": "db",
+        "position": {
+          "x": 400,
+          "y": 0
+        },
+        "params": {
+          "preset": "postgres",
+          "connectionPool": 50,
+          "queueLimit": 200,
+          "query": {
+            "p50Ms": 4,
+            "p99Ms": 25
+          },
+          "costPerMonth": 60
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_api_db",
+        "source": "api",
+        "target": "db"
+      }
+    ]
+  }
+}

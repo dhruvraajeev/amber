@@ -1,0 +1,109 @@
+{
+  "description": "Agent with a tool edge but no llm edge.",
+  "expect": [
+    "AGENT_EDGES"
+  ],
+  "config": {
+    "durationS": 60,
+    "seed": 42,
+    "warmupS": 5
+  },
+  "design": {
+    "name": "agent-edges",
+    "version": 1,
+    "nodes": [
+      {
+        "id": "users",
+        "kind": "users",
+        "label": "users",
+        "position": {
+          "x": 200,
+          "y": 0
+        },
+        "params": {
+          "traffic": {
+            "type": "constant",
+            "rps": 50
+          },
+          "clientTimeoutMs": 5000
+        }
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "label": "api",
+        "position": {
+          "x": 400,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "agent",
+        "kind": "agent",
+        "label": "agent",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "params": {
+          "llmCallsMean": 3,
+          "toolCallsPerStep": 1,
+          "toolLatency": {
+            "p50Ms": 100,
+            "p99Ms": 500
+          },
+          "basePromptTokens": 1000,
+          "contextGrowthTokensPerStep": 300,
+          "outputTokensPerCall": 200
+        }
+      },
+      {
+        "id": "tools",
+        "kind": "service",
+        "label": "tools",
+        "position": {
+          "x": 800,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_users_api",
+        "source": "users",
+        "target": "api"
+      },
+      {
+        "id": "e_api_agent",
+        "source": "api",
+        "target": "agent"
+      },
+      {
+        "id": "e_agent_tools",
+        "source": "agent",
+        "target": "tools",
+        "role": "tool"
+      }
+    ]
+  }
+}

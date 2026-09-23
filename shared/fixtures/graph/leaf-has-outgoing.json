@@ -1,0 +1,107 @@
+{
+  "description": "Database calling a service.",
+  "expect": [
+    "LEAF_HAS_OUTGOING"
+  ],
+  "config": {
+    "durationS": 60,
+    "seed": 42,
+    "warmupS": 5
+  },
+  "design": {
+    "name": "leaf-has-outgoing",
+    "version": 1,
+    "nodes": [
+      {
+        "id": "users",
+        "kind": "users",
+        "label": "users",
+        "position": {
+          "x": 200,
+          "y": 0
+        },
+        "params": {
+          "traffic": {
+            "type": "constant",
+            "rps": 50
+          },
+          "clientTimeoutMs": 5000
+        }
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "label": "api",
+        "position": {
+          "x": 400,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "db",
+        "kind": "database",
+        "label": "db",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "params": {
+          "preset": "postgres",
+          "connectionPool": 50,
+          "queueLimit": 200,
+          "query": {
+            "p50Ms": 4,
+            "p99Ms": 25
+          },
+          "costPerMonth": 60
+        }
+      },
+      {
+        "id": "other",
+        "kind": "service",
+        "label": "other",
+        "position": {
+          "x": 800,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_users_api",
+        "source": "users",
+        "target": "api"
+      },
+      {
+        "id": "e_api_db",
+        "source": "api",
+        "target": "db"
+      },
+      {
+        "id": "e_db_other",
+        "source": "db",
+        "target": "other"
+      }
+    ]
+  }
+}

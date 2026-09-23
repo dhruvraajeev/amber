@@ -1,0 +1,64 @@
+{
+  "description": "Edge to a node id that does not exist.",
+  "expect": [
+    "EDGE_REF"
+  ],
+  "config": {
+    "durationS": 60,
+    "seed": 42,
+    "warmupS": 5
+  },
+  "design": {
+    "name": "edge-ref",
+    "version": 1,
+    "nodes": [
+      {
+        "id": "users",
+        "kind": "users",
+        "label": "users",
+        "position": {
+          "x": 200,
+          "y": 0
+        },
+        "params": {
+          "traffic": {
+            "type": "constant",
+            "rps": 50
+          },
+          "clientTimeoutMs": 5000
+        }
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "label": "api",
+        "position": {
+          "x": 400,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_users_api",
+        "source": "users",
+        "target": "api"
+      },
+      {
+        "id": "e_api_ghost",
+        "source": "api",
+        "target": "ghost"
+      }
+    ]
+  }
+}

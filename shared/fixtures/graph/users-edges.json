@@ -1,0 +1,83 @@
+{
+  "description": "Users fans out to two nodes instead of one.",
+  "expect": [
+    "USERS_EDGES"
+  ],
+  "config": {
+    "durationS": 60,
+    "seed": 42,
+    "warmupS": 5
+  },
+  "design": {
+    "name": "users-edges",
+    "version": 1,
+    "nodes": [
+      {
+        "id": "users",
+        "kind": "users",
+        "label": "users",
+        "position": {
+          "x": 200,
+          "y": 0
+        },
+        "params": {
+          "traffic": {
+            "type": "constant",
+            "rps": 50
+          },
+          "clientTimeoutMs": 5000
+        }
+      },
+      {
+        "id": "a",
+        "kind": "service",
+        "label": "a",
+        "position": {
+          "x": 400,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "b",
+        "kind": "service",
+        "label": "b",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_users_a",
+        "source": "users",
+        "target": "a"
+      },
+      {
+        "id": "e_users_b",
+        "source": "users",
+        "target": "b"
+      }
+    ]
+  }
+}

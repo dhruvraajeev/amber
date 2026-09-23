@@ -1,0 +1,205 @@
+{
+  "description": "Every node kind, wired legally. No issues.",
+  "expect": [],
+  "config": {
+    "durationS": 60,
+    "seed": 42,
+    "warmupS": 5
+  },
+  "design": {
+    "name": "valid",
+    "version": 1,
+    "nodes": [
+      {
+        "id": "users",
+        "kind": "users",
+        "label": "users",
+        "position": {
+          "x": 200,
+          "y": 0
+        },
+        "params": {
+          "traffic": {
+            "type": "constant",
+            "rps": 50
+          },
+          "clientTimeoutMs": 5000
+        }
+      },
+      {
+        "id": "lb",
+        "kind": "loadBalancer",
+        "label": "lb",
+        "position": {
+          "x": 400,
+          "y": 0
+        },
+        "params": {
+          "algorithm": "roundRobin",
+          "overhead": {
+            "p50Ms": 1,
+            "p99Ms": 3
+          }
+        }
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "label": "api",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "cache",
+        "kind": "cache",
+        "label": "cache",
+        "position": {
+          "x": 800,
+          "y": 0
+        },
+        "params": {
+          "hitRate": 0.8,
+          "latency": {
+            "p50Ms": 1,
+            "p99Ms": 4
+          },
+          "costPerMonth": 25
+        }
+      },
+      {
+        "id": "db",
+        "kind": "database",
+        "label": "db",
+        "position": {
+          "x": 1000,
+          "y": 0
+        },
+        "params": {
+          "preset": "postgres",
+          "connectionPool": 50,
+          "queueLimit": 200,
+          "query": {
+            "p50Ms": 4,
+            "p99Ms": 25
+          },
+          "costPerMonth": 60
+        }
+      },
+      {
+        "id": "agent",
+        "kind": "agent",
+        "label": "agent",
+        "position": {
+          "x": 1200,
+          "y": 0
+        },
+        "params": {
+          "llmCallsMean": 3,
+          "toolCallsPerStep": 1,
+          "toolLatency": {
+            "p50Ms": 100,
+            "p99Ms": 500
+          },
+          "basePromptTokens": 1000,
+          "contextGrowthTokensPerStep": 300,
+          "outputTokensPerCall": 200
+        }
+      },
+      {
+        "id": "llm",
+        "kind": "llm",
+        "label": "llm",
+        "position": {
+          "x": 1400,
+          "y": 0
+        },
+        "params": {
+          "mode": "hosted",
+          "presetId": "hosted-small-paid",
+          "ttft": {
+            "p50Ms": 350,
+            "p99Ms": 1200
+          },
+          "tokensPerSecond": {
+            "p50": 90,
+            "p99Low": 30
+          },
+          "inputUsdPer1M": 0.15,
+          "outputUsdPer1M": 0.6,
+          "rateLimitRpm": 3000,
+          "maxRetries": 2
+        }
+      },
+      {
+        "id": "tools",
+        "kind": "service",
+        "label": "tools",
+        "position": {
+          "x": 1600,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_users_lb",
+        "source": "users",
+        "target": "lb"
+      },
+      {
+        "id": "e_lb_api",
+        "source": "lb",
+        "target": "api"
+      },
+      {
+        "id": "e_api_cache",
+        "source": "api",
+        "target": "cache"
+      },
+      {
+        "id": "e_cache_db",
+        "source": "cache",
+        "target": "db"
+      },
+      {
+        "id": "e_api_agent",
+        "source": "api",
+        "target": "agent"
+      },
+      {
+        "id": "e_agent_llm",
+        "source": "agent",
+        "target": "llm",
+        "role": "llm"
+      },
+      {
+        "id": "e_agent_tools",
+        "source": "agent",
+        "target": "tools",
+        "role": "tool"
+      }
+    ]
+  }
+}

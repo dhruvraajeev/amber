@@ -1,0 +1,850 @@
+{
+  "description": "16 nodes, 106 forward edges (still a DAG).",
+  "expect": [
+    "LIMIT_EDGES"
+  ],
+  "config": {
+    "durationS": 60,
+    "seed": 42,
+    "warmupS": 5
+  },
+  "design": {
+    "name": "limit-edges",
+    "version": 1,
+    "nodes": [
+      {
+        "id": "users",
+        "kind": "users",
+        "label": "users",
+        "position": {
+          "x": 200,
+          "y": 0
+        },
+        "params": {
+          "traffic": {
+            "type": "constant",
+            "rps": 50
+          },
+          "clientTimeoutMs": 5000
+        }
+      },
+      {
+        "id": "s1",
+        "kind": "service",
+        "label": "s1",
+        "position": {
+          "x": 400,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s2",
+        "kind": "service",
+        "label": "s2",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s3",
+        "kind": "service",
+        "label": "s3",
+        "position": {
+          "x": 800,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s4",
+        "kind": "service",
+        "label": "s4",
+        "position": {
+          "x": 1000,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s5",
+        "kind": "service",
+        "label": "s5",
+        "position": {
+          "x": 1200,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s6",
+        "kind": "service",
+        "label": "s6",
+        "position": {
+          "x": 1400,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s7",
+        "kind": "service",
+        "label": "s7",
+        "position": {
+          "x": 1600,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s8",
+        "kind": "service",
+        "label": "s8",
+        "position": {
+          "x": 1800,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s9",
+        "kind": "service",
+        "label": "s9",
+        "position": {
+          "x": 2000,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s10",
+        "kind": "service",
+        "label": "s10",
+        "position": {
+          "x": 2200,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s11",
+        "kind": "service",
+        "label": "s11",
+        "position": {
+          "x": 2400,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s12",
+        "kind": "service",
+        "label": "s12",
+        "position": {
+          "x": 2600,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s13",
+        "kind": "service",
+        "label": "s13",
+        "position": {
+          "x": 2800,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s14",
+        "kind": "service",
+        "label": "s14",
+        "position": {
+          "x": 3000,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "s15",
+        "kind": "service",
+        "label": "s15",
+        "position": {
+          "x": 3200,
+          "y": 0
+        },
+        "params": {
+          "replicas": 2,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 20,
+            "p99Ms": 100
+          },
+          "costPerReplicaMonth": 30
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_users_s1",
+        "source": "users",
+        "target": "s1"
+      },
+      {
+        "id": "e_s1_s2",
+        "source": "s1",
+        "target": "s2"
+      },
+      {
+        "id": "e_s1_s3",
+        "source": "s1",
+        "target": "s3"
+      },
+      {
+        "id": "e_s1_s4",
+        "source": "s1",
+        "target": "s4"
+      },
+      {
+        "id": "e_s1_s5",
+        "source": "s1",
+        "target": "s5"
+      },
+      {
+        "id": "e_s1_s6",
+        "source": "s1",
+        "target": "s6"
+      },
+      {
+        "id": "e_s1_s7",
+        "source": "s1",
+        "target": "s7"
+      },
+      {
+        "id": "e_s1_s8",
+        "source": "s1",
+        "target": "s8"
+      },
+      {
+        "id": "e_s1_s9",
+        "source": "s1",
+        "target": "s9"
+      },
+      {
+        "id": "e_s1_s10",
+        "source": "s1",
+        "target": "s10"
+      },
+      {
+        "id": "e_s1_s11",
+        "source": "s1",
+        "target": "s11"
+      },
+      {
+        "id": "e_s1_s12",
+        "source": "s1",
+        "target": "s12"
+      },
+      {
+        "id": "e_s1_s13",
+        "source": "s1",
+        "target": "s13"
+      },
+      {
+        "id": "e_s1_s14",
+        "source": "s1",
+        "target": "s14"
+      },
+      {
+        "id": "e_s1_s15",
+        "source": "s1",
+        "target": "s15"
+      },
+      {
+        "id": "e_s2_s3",
+        "source": "s2",
+        "target": "s3"
+      },
+      {
+        "id": "e_s2_s4",
+        "source": "s2",
+        "target": "s4"
+      },
+      {
+        "id": "e_s2_s5",
+        "source": "s2",
+        "target": "s5"
+      },
+      {
+        "id": "e_s2_s6",
+        "source": "s2",
+        "target": "s6"
+      },
+      {
+        "id": "e_s2_s7",
+        "source": "s2",
+        "target": "s7"
+      },
+      {
+        "id": "e_s2_s8",
+        "source": "s2",
+        "target": "s8"
+      },
+      {
+        "id": "e_s2_s9",
+        "source": "s2",
+        "target": "s9"
+      },
+      {
+        "id": "e_s2_s10",
+        "source": "s2",
+        "target": "s10"
+      },
+      {
+        "id": "e_s2_s11",
+        "source": "s2",
+        "target": "s11"
+      },
+      {
+        "id": "e_s2_s12",
+        "source": "s2",
+        "target": "s12"
+      },
+      {
+        "id": "e_s2_s13",
+        "source": "s2",
+        "target": "s13"
+      },
+      {
+        "id": "e_s2_s14",
+        "source": "s2",
+        "target": "s14"
+      },
+      {
+        "id": "e_s2_s15",
+        "source": "s2",
+        "target": "s15"
+      },
+      {
+        "id": "e_s3_s4",
+        "source": "s3",
+        "target": "s4"
+      },
+      {
+        "id": "e_s3_s5",
+        "source": "s3",
+        "target": "s5"
+      },
+      {
+        "id": "e_s3_s6",
+        "source": "s3",
+        "target": "s6"
+      },
+      {
+        "id": "e_s3_s7",
+        "source": "s3",
+        "target": "s7"
+      },
+      {
+        "id": "e_s3_s8",
+        "source": "s3",
+        "target": "s8"
+      },
+      {
+        "id": "e_s3_s9",
+        "source": "s3",
+        "target": "s9"
+      },
+      {
+        "id": "e_s3_s10",
+        "source": "s3",
+        "target": "s10"
+      },
+      {
+        "id": "e_s3_s11",
+        "source": "s3",
+        "target": "s11"
+      },
+      {
+        "id": "e_s3_s12",
+        "source": "s3",
+        "target": "s12"
+      },
+      {
+        "id": "e_s3_s13",
+        "source": "s3",
+        "target": "s13"
+      },
+      {
+        "id": "e_s3_s14",
+        "source": "s3",
+        "target": "s14"
+      },
+      {
+        "id": "e_s3_s15",
+        "source": "s3",
+        "target": "s15"
+      },
+      {
+        "id": "e_s4_s5",
+        "source": "s4",
+        "target": "s5"
+      },
+      {
+        "id": "e_s4_s6",
+        "source": "s4",
+        "target": "s6"
+      },
+      {
+        "id": "e_s4_s7",
+        "source": "s4",
+        "target": "s7"
+      },
+      {
+        "id": "e_s4_s8",
+        "source": "s4",
+        "target": "s8"
+      },
+      {
+        "id": "e_s4_s9",
+        "source": "s4",
+        "target": "s9"
+      },
+      {
+        "id": "e_s4_s10",
+        "source": "s4",
+        "target": "s10"
+      },
+      {
+        "id": "e_s4_s11",
+        "source": "s4",
+        "target": "s11"
+      },
+      {
+        "id": "e_s4_s12",
+        "source": "s4",
+        "target": "s12"
+      },
+      {
+        "id": "e_s4_s13",
+        "source": "s4",
+        "target": "s13"
+      },
+      {
+        "id": "e_s4_s14",
+        "source": "s4",
+        "target": "s14"
+      },
+      {
+        "id": "e_s4_s15",
+        "source": "s4",
+        "target": "s15"
+      },
+      {
+        "id": "e_s5_s6",
+        "source": "s5",
+        "target": "s6"
+      },
+      {
+        "id": "e_s5_s7",
+        "source": "s5",
+        "target": "s7"
+      },
+      {
+        "id": "e_s5_s8",
+        "source": "s5",
+        "target": "s8"
+      },
+      {
+        "id": "e_s5_s9",
+        "source": "s5",
+        "target": "s9"
+      },
+      {
+        "id": "e_s5_s10",
+        "source": "s5",
+        "target": "s10"
+      },
+      {
+        "id": "e_s5_s11",
+        "source": "s5",
+        "target": "s11"
+      },
+      {
+        "id": "e_s5_s12",
+        "source": "s5",
+        "target": "s12"
+      },
+      {
+        "id": "e_s5_s13",
+        "source": "s5",
+        "target": "s13"
+      },
+      {
+        "id": "e_s5_s14",
+        "source": "s5",
+        "target": "s14"
+      },
+      {
+        "id": "e_s5_s15",
+        "source": "s5",
+        "target": "s15"
+      },
+      {
+        "id": "e_s6_s7",
+        "source": "s6",
+        "target": "s7"
+      },
+      {
+        "id": "e_s6_s8",
+        "source": "s6",
+        "target": "s8"
+      },
+      {
+        "id": "e_s6_s9",
+        "source": "s6",
+        "target": "s9"
+      },
+      {
+        "id": "e_s6_s10",
+        "source": "s6",
+        "target": "s10"
+      },
+      {
+        "id": "e_s6_s11",
+        "source": "s6",
+        "target": "s11"
+      },
+      {
+        "id": "e_s6_s12",
+        "source": "s6",
+        "target": "s12"
+      },
+      {
+        "id": "e_s6_s13",
+        "source": "s6",
+        "target": "s13"
+      },
+      {
+        "id": "e_s6_s14",
+        "source": "s6",
+        "target": "s14"
+      },
+      {
+        "id": "e_s6_s15",
+        "source": "s6",
+        "target": "s15"
+      },
+      {
+        "id": "e_s7_s8",
+        "source": "s7",
+        "target": "s8"
+      },
+      {
+        "id": "e_s7_s9",
+        "source": "s7",
+        "target": "s9"
+      },
+      {
+        "id": "e_s7_s10",
+        "source": "s7",
+        "target": "s10"
+      },
+      {
+        "id": "e_s7_s11",
+        "source": "s7",
+        "target": "s11"
+      },
+      {
+        "id": "e_s7_s12",
+        "source": "s7",
+        "target": "s12"
+      },
+      {
+        "id": "e_s7_s13",
+        "source": "s7",
+        "target": "s13"
+      },
+      {
+        "id": "e_s7_s14",
+        "source": "s7",
+        "target": "s14"
+      },
+      {
+        "id": "e_s7_s15",
+        "source": "s7",
+        "target": "s15"
+      },
+      {
+        "id": "e_s8_s9",
+        "source": "s8",
+        "target": "s9"
+      },
+      {
+        "id": "e_s8_s10",
+        "source": "s8",
+        "target": "s10"
+      },
+      {
+        "id": "e_s8_s11",
+        "source": "s8",
+        "target": "s11"
+      },
+      {
+        "id": "e_s8_s12",
+        "source": "s8",
+        "target": "s12"
+      },
+      {
+        "id": "e_s8_s13",
+        "source": "s8",
+        "target": "s13"
+      },
+      {
+        "id": "e_s8_s14",
+        "source": "s8",
+        "target": "s14"
+      },
+      {
+        "id": "e_s8_s15",
+        "source": "s8",
+        "target": "s15"
+      },
+      {
+        "id": "e_s9_s10",
+        "source": "s9",
+        "target": "s10"
+      },
+      {
+        "id": "e_s9_s11",
+        "source": "s9",
+        "target": "s11"
+      },
+      {
+        "id": "e_s9_s12",
+        "source": "s9",
+        "target": "s12"
+      },
+      {
+        "id": "e_s9_s13",
+        "source": "s9",
+        "target": "s13"
+      },
+      {
+        "id": "e_s9_s14",
+        "source": "s9",
+        "target": "s14"
+      },
+      {
+        "id": "e_s9_s15",
+        "source": "s9",
+        "target": "s15"
+      },
+      {
+        "id": "e_s10_s11",
+        "source": "s10",
+        "target": "s11"
+      },
+      {
+        "id": "e_s10_s12",
+        "source": "s10",
+        "target": "s12"
+      },
+      {
+        "id": "e_s10_s13",
+        "source": "s10",
+        "target": "s13"
+      },
+      {
+        "id": "e_s10_s14",
+        "source": "s10",
+        "target": "s14"
+      },
+      {
+        "id": "e_s10_s15",
+        "source": "s10",
+        "target": "s15"
+      },
+      {
+        "id": "e_s11_s12",
+        "source": "s11",
+        "target": "s12"
+      },
+      {
+        "id": "e_s11_s13",
+        "source": "s11",
+        "target": "s13"
+      },
+      {
+        "id": "e_s11_s14",
+        "source": "s11",
+        "target": "s14"
+      },
+      {
+        "id": "e_s11_s15",
+        "source": "s11",
+        "target": "s15"
+      },
+      {
+        "id": "e_s12_s13",
+        "source": "s12",
+        "target": "s13"
+      },
+      {
+        "id": "e_s12_s14",
+        "source": "s12",
+        "target": "s14"
+      },
+      {
+        "id": "e_s12_s15",
+        "source": "s12",
+        "target": "s15"
+      },
+      {
+        "id": "e_s13_s14",
+        "source": "s13",
+        "target": "s14"
+      },
+      {
+        "id": "e_s13_s15",
+        "source": "s13",
+        "target": "s15"
+      },
+      {
+        "id": "e_s14_s15",
+        "source": "s14",
+        "target": "s15"
+      }
+    ]
+  }
+}
