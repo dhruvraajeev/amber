@@ -103,4 +103,14 @@ describe('run slice', () => {
     s.getState().togglePlay()
     expect(s.getState().playing).toBe(false)
   })
+
+  it('drops the last result when another design is loaded, but keeps pins', async () => {
+    const s = await fresh()
+    s.getState().loadTemplate(classic as Design)
+    await s.getState().run({ durationS: 60, seed: 1, warmupS: 5 })
+    s.getState().pin()
+    s.getState().loadTemplate(agent as Design)
+    expect(s.getState()).toMatchObject({ status: 'idle', result: null, playhead: 0 })
+    expect(s.getState().pinned).toHaveLength(1)
+  })
 })

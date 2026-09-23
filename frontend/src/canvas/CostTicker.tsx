@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { usd } from '../lib/format'
+import { useCountUp } from '../lib/useCountUp'
 import { useStore } from '../store'
 import type { Design, RunResult } from '../types/contracts'
 
@@ -16,10 +16,16 @@ export default function CostTicker() {
     <div
       role="img"
       aria-label={`Estimated ${usd(result.cost.monthlyTotalUsd)} a month; ${usd(now)} a month at the current traffic`}
-      className="pointer-events-none absolute top-3 right-3 z-10 rounded-md border border-border bg-panel/90 px-3 py-2 text-right"
+      className="pointer-events-none absolute top-4 right-4 z-10 min-w-44 rounded-2xl border border-border bg-panel/85 px-4 py-3 shadow-[0_18px_40px_-20px_rgb(0_0_0/0.9),0_0_40px_-18px_rgb(255_106_43/0.6)] backdrop-blur-sm"
     >
-      <div className="num text-lg">{usd(total)}/mo</div>
-      <div className="num text-xs text-muted">{usd(now)}/mo at {point?.t ?? 0} s</div>
+      <div className="text-xs text-muted">Monthly cost</div>
+      <div className="figure mt-0.5 text-[22px] font-semibold leading-tight">
+        {usd(total)}
+        <span className="text-sm font-normal text-muted">/mo</span>
+      </div>
+      <div className="num mt-1 text-[11px] text-muted">
+        <span className="text-accent-2">{usd(now)}</span>/mo at {point?.t ?? 0} s
+      </div>
     </div>
   )
 }
@@ -34,25 +40,4 @@ function costAt(result: RunResult, design: Design, i: number): number {
     const avg = result.timeline.reduce((s, p) => s + rate(p), 0) / result.timeline.length
     return sum + (avg ? (row.usd * rate(result.timeline[i])) / avg : row.usd)
   }, 0)
-}
-
-/** Eases from the last shown value to `target` over 800 ms (ease-out cubic). Jumps under reduced motion. */
-function useCountUp(target: number): number {
-  const [value, setValue] = useState(0)
-  const shown = useRef(0)
-  useEffect(() => {
-    const from = shown.current
-    const set = (v: number) => setValue((shown.current = v))
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return set(target)
-    const t0 = performance.now()
-    let raf = 0
-    const frame = (now: number) => {
-      const k = Math.min(1, (now - t0) / 800)
-      set(from + (target - from) * (1 - (1 - k) ** 3))
-      if (k < 1) raf = requestAnimationFrame(frame)
-    }
-    raf = requestAnimationFrame(frame)
-    return () => cancelAnimationFrame(raf)
-  }, [target])
-  return value
 }

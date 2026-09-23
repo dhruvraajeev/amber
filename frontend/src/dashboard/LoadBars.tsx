@@ -1,5 +1,6 @@
 import { hasCapacity } from '../lib/color'
-import { count, level, LEVEL_ICON, pct } from '../lib/format'
+import { count, level, pct } from '../lib/format'
+import LevelIcon from '../ui/LevelIcon'
 import type { RunResult } from '../types/contracts'
 
 // Average utilization per node, busiest first, with a tick at its peak. The bar's color, icon and
@@ -7,25 +8,28 @@ import type { RunResult } from '../types/contracts'
 
 export default function LoadBars({ result, label }: { result: RunResult; label: (id: string) => string }) {
   const rows = result.nodes.filter((n) => hasCapacity(n.kind)).sort((a, b) => b.utilAvg - a.utilAvg)
-  if (!rows.length) return <p className="text-sm text-muted">No nodes with capacity to measure.</p>
+  if (!rows.length) return <p className="text-[13px] text-muted">No nodes with capacity to measure.</p>
   const top = rows[0]
   return (
     <figure className="flex flex-col gap-3">
-      <figcaption className="text-sm">
+      <figcaption className="text-[13px]">
         Busiest: {label(top.id)} at {pct(top.utilAvg)} on average, peaking at {pct(top.utilMax)}.
       </figcaption>
-      <ul className="grid grid-cols-[minmax(6rem,10rem)_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 text-sm">
+      <ul className="grid grid-cols-[minmax(6rem,10rem)_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 text-[13px]">
         {rows.map((n) => {
           const lv = level(n.utilAvg)
           return (
             <li key={n.id} className="contents">
               <span className="truncate">{label(n.id)}</span>
-              <span className="relative h-2 rounded bg-panel-2" aria-hidden>
-                <span className="absolute inset-y-0 left-0 rounded" style={{ width: pct(Math.min(1, n.utilAvg)), background: `var(--${lv})` }} />
-                <span className="absolute -inset-y-1 w-0.5 bg-text" style={{ left: pct(Math.min(1, n.utilMax)) }} title="peak" />
+              <span className="relative h-2 rounded-full bg-panel-3" aria-hidden>
+                <span
+                  className="absolute inset-y-0 left-0 rounded-full"
+                  style={{ width: pct(Math.min(1, n.utilAvg)), background: `linear-gradient(90deg, color-mix(in srgb, var(--${lv}) 35%, transparent), var(--${lv}))`, boxShadow: `0 0 12px -2px var(--${lv})` }}
+                />
+                <span className="absolute -inset-y-1 w-0.5 rounded-full bg-text" style={{ left: pct(Math.min(1, n.utilMax)) }} title="peak" />
               </span>
-              <span className="num text-xs">
-                <span style={{ color: `var(--${lv})` }} aria-hidden>{LEVEL_ICON[lv]}</span>{' '}
+              <span className="num flex items-center gap-1.5 text-xs">
+                <LevelIcon level={lv} />
                 {pct(n.utilAvg)} avg · {pct(n.utilMax)} peak
                 <span className="text-muted">
                   {n.queueMax >= 1 && ` · queue ≤ ${count(n.queueMax)}`}

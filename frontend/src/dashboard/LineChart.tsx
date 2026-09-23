@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useId, useState, type KeyboardEvent, type PointerEvent } from 'react'
 
 export interface Series { label: string; color: string; values: number[] }
 
@@ -14,6 +14,7 @@ export default function LineChart({ xs, series, format, max, summary }: {
   summary: string // the one-line text version of the chart (§11.3 accessibility)
 }) {
   const [at, setAt] = useState<number | null>(null)
+  const gid = useId().replace(/[^a-zA-Z0-9]/g, '') // usable inside url(#…)
   const top = max ?? niceCeil(Math.max(0, ...series.flatMap((s) => s.values)))
   const last = xs.length - 1
   const x = (i: number) => (last > 0 ? (i / last) * 1000 : 500)
@@ -31,7 +32,7 @@ export default function LineChart({ xs, series, format, max, summary }: {
 
   return (
     <figure className="flex flex-col gap-2">
-      <figcaption className="text-sm">{summary}</figcaption>
+      <figcaption className="text-[13px]">{summary}</figcaption>
       {series.length > 1 && (
         <ul className="flex gap-4 text-xs text-muted">
           {series.map((s) => (
@@ -49,7 +50,7 @@ export default function LineChart({ xs, series, format, max, summary }: {
           <span>{format(0)}</span>
         </div>
         <div
-          className="relative h-36 touch-none"
+          className="relative h-40 touch-none rounded-lg"
           tabIndex={0}
           role="img"
           aria-label={summary}
@@ -59,25 +60,43 @@ export default function LineChart({ xs, series, format, max, summary }: {
           onBlur={() => setAt(null)}
         >
           <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible">
+            <defs>
+              <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" style={{ stopColor: series.at(-1)!.color, stopOpacity: 0.16 }} />
+                <stop offset="0.75" style={{ stopColor: series.at(-1)!.color, stopOpacity: 0 }} />
+              </linearGradient>
+            </defs>
             {[0, 50, 100].map((g) => (
-              <line key={g} x1={0} x2={1000} y1={g} y2={g} stroke="var(--border)" vectorEffect="non-scaling-stroke" />
+              <line key={g} x1={0} x2={1000} y1={g} y2={g} stroke="var(--border)" strokeDasharray={g === 100 ? undefined : '3 5'} vectorEffect="non-scaling-stroke" />
             ))}
+            {/* Only the last (hottest) series gets a lit area; stacked fills would muddy each other. */}
+            <path d={`${path(series.at(-1)!.values)}L${x(last)},100L${x(0)},100Z`} fill={`url(#${gid})`} />
             {series.map((s) => (
-              <path key={s.label} d={path(s.values)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              <path
+                key={s.label} d={path(s.values)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke" style={{ filter: `drop-shadow(0 0 6px color-mix(in srgb, ${s.color} 55%, transparent))` }}
+              />
             ))}
           </svg>
           {at !== null && (
             <>
-              <div className="pointer-events-none absolute inset-y-0 w-px bg-muted" style={{ left: `${x(at) / 10}%` }} />
+              <div className="pointer-events-none absolute inset-y-0 w-px bg-[linear-gradient(transparent,var(--muted),transparent)]" style={{ left: `${x(at) / 10}%` }} />
+              {series.map((s) => (
+                <span
+                  key={s.label}
+                  className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-panel"
+                  style={{ left: `${x(at) / 10}%`, top: `${y(s.values[at])}%`, background: s.color, boxShadow: `0 0 10px ${s.color}` }}
+                />
+              ))}
               <div
-                className="pointer-events-none absolute top-0 z-10 rounded border border-border bg-panel-2 px-2 py-1 text-xs whitespace-nowrap"
-                style={x(at) > 600 ? { right: `${100 - x(at) / 10}%`, marginRight: 8 } : { left: `${x(at) / 10}%`, marginLeft: 8 }}
+                className="pointer-events-none absolute top-0 z-10 rounded-xl border border-border-strong bg-panel-3/95 px-3 py-2 text-xs whitespace-nowrap shadow-[0_12px_30px_-10px_rgb(0_0_0/0.9)] backdrop-blur-sm"
+                style={x(at) > 600 ? { right: `${100 - x(at) / 10}%`, marginRight: 12 } : { left: `${x(at) / 10}%`, marginLeft: 12 }}
               >
-                <div className="num text-muted">{xs[at]} s</div>
+                <div className="num mb-1 text-muted">{xs[at]} s</div>
                 {series.map((s) => (
-                  <div key={s.label} className="flex items-center gap-1.5">
+                  <div key={s.label} className="flex items-center gap-2">
                     <Key color={s.color} />
-                    <span className="num font-semibold">{format(s.values[at])}</span>
+                    <span className="num font-medium">{format(s.values[at])}</span>
                     <span className="text-muted">{s.label}</span>
                   </div>
                 ))}
@@ -96,7 +115,7 @@ export default function LineChart({ xs, series, format, max, summary }: {
 }
 
 /** A series' legend key: a short stroke of its color, like the line it names. */
-const Key = ({ color }: { color: string }) => <span className="h-0.5 w-3 rounded" style={{ background: color }} />
+const Key = ({ color }: { color: string }) => <span className="h-0.5 w-3 rounded-full" style={{ background: color, boxShadow: `0 0 6px ${color}` }} />
 
 /** Rounds up to 1, 2, or 5 × a power of ten, so the axis top reads cleanly. */
 function niceCeil(v: number): number {

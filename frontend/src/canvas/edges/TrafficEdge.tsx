@@ -4,7 +4,7 @@ import { useEdgeTraffic } from '../../run/Playback'
 import type { FlowEdge } from '../map'
 
 // Every edge (§11.3). Before a run: a plain curve. After: thickness follows throughput at the playhead,
-// amber dots travel along it (more and faster as traffic rises, at most 8), and it turns rust when its
+// orange dots travel along it (more and faster as traffic rises, at most 8), and it turns red when its
 // target is turning requests away. Under prefers-reduced-motion, theme.css hides the dots and dashes the line.
 export default function TrafficEdge({ target, label, markerEnd, interactionWidth, ...geometry }: EdgeProps<FlowEdge>) {
   const [path, labelX, labelY] = getBezierPath(geometry)
@@ -23,7 +23,7 @@ export default function TrafficEdge({ target, label, markerEnd, interactionWidth
       />
       <g className="traffic-dots" aria-hidden>
         {Array.from({ length: n }, (_, i) => (
-          <circle key={i} r={3} fill={errors ? 'var(--crit)' : 'var(--accent)'}>
+          <circle key={i} r={2.75} fill="currentColor" style={{ color: errors ? 'var(--crit)' : 'var(--accent)' }}>
             {/* Negative begin offsets spread the dots evenly along the path. */}
             <animateMotion dur={`${dur}s`} begin={`${(-i * dur) / n}s`} repeatCount="indefinite" path={path} />
           </circle>

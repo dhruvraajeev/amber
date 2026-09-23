@@ -23,7 +23,7 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05)
 }
 
-describe('theme tokens (plan §11.3)', () => {
+describe('theme tokens (plan §11.3, revised 2026-09-23)', () => {
   it('keeps ok / warn / crit distinguishable in greyscale', () => {
     const [ok, warn, crit] = ['ok', 'warn', 'crit'].map(token)
     for (const [a, b] of [[ok, warn], [warn, crit], [ok, crit]]) {

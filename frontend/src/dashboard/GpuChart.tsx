@@ -5,7 +5,7 @@ import LineChart from './LineChart'
 // Self-hosted LLM replicas: KV-cache use and the batch. Two charts per node, since a share and a
 // count don't belong on one axis.
 export default function GpuChart({ result, label }: { result: RunResult; label: (id: string) => string }) {
-  if (!result.gpu.length) return <p className="text-sm text-muted">No self-hosted LLMs in this design, so there is no GPU to show.</p>
+  if (!result.gpu.length) return <p className="text-[13px] text-muted">No self-hosted LLMs in this design, so there is no GPU to show.</p>
   return (
     <div className="flex flex-col gap-6">
       {result.gpu.map(({ nodeId, points }) => {
@@ -16,7 +16,7 @@ export default function GpuChart({ result, label }: { result: RunResult; label: 
         const peakWaiting = Math.max(...points.map((p) => p.waiting))
         return (
           <section key={nodeId} className="flex flex-col gap-3">
-            <h3 className="text-sm font-semibold">{label(nodeId)}</h3>
+            <h3 className="text-[13px] font-semibold">{label(nodeId)}</h3>
             <LineChart
               xs={xs}
               max={1}

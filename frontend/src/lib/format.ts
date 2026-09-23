@@ -22,5 +22,3 @@ export const count = (v: number) => grouped(v)
 /** Load level for a utilization, with §11.3's thresholds: olive < 0.6 ≤ orange < 0.85 ≤ rust. */
 export type Level = 'ok' | 'warn' | 'crit'
 export const level = (util: number): Level => (util >= 0.85 ? 'crit' : util >= 0.6 ? 'warn' : 'ok')
-/** Status is never hue alone (§11.3): each level also has an icon. */
-export const LEVEL_ICON: Record<Level, string> = { ok: '●', warn: '▲', crit: '✕' }

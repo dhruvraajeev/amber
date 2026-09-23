@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react'
+import { Bot, BrainCircuit, Database, Server, Split, Users, Zap, type LucideIcon } from 'lucide-react'
 import hostedLlms from '@shared/presets/hosted_llms.json'
 import type { Design, DesignEdge, DesignNode, LlmParams, NodeKind, NodeParamsByKind } from '../types/contracts'
 
@@ -40,14 +41,14 @@ export async function designHash(design: Design): Promise<string> {
 
 // ── Palette entries and defaults for newly dropped nodes ────────────────────
 
-export const KINDS: { kind: NodeKind; name: string; icon: string }[] = [
-  { kind: 'users', name: 'Users', icon: '◎' },
-  { kind: 'loadBalancer', name: 'Load balancer', icon: '⑂' },
-  { kind: 'service', name: 'Service', icon: '▣' },
-  { kind: 'cache', name: 'Cache', icon: '↯' },
-  { kind: 'database', name: 'Database', icon: '≣' },
-  { kind: 'agent', name: 'Agent', icon: '✳' },
-  { kind: 'llm', name: 'LLM', icon: '✦' },
+export const KINDS: { kind: NodeKind; name: string; icon: LucideIcon }[] = [
+  { kind: 'users', name: 'Users', icon: Users },
+  { kind: 'loadBalancer', name: 'Load balancer', icon: Split },
+  { kind: 'service', name: 'Service', icon: Server },
+  { kind: 'cache', name: 'Cache', icon: Zap },
+  { kind: 'database', name: 'Database', icon: Database },
+  { kind: 'agent', name: 'Agent', icon: Bot },
+  { kind: 'llm', name: 'LLM', icon: BrainCircuit },
 ]
 
 const llmPreset = hostedLlms[0]

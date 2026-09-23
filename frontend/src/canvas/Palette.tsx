@@ -3,11 +3,11 @@ import { KINDS } from './map'
 
 export const DRAG_MIME = 'application/amber-kind'
 
-// Drag a kind onto the canvas, or click (or Enter) to drop it in the middle of the view.
+// The palette rail: drag a kind onto the canvas, or click (or Enter) to drop it in the view.
 export default function Palette({ onAdd }: { onAdd: (kind: NodeKind) => void }) {
   return (
-    <aside className="flex flex-col gap-1 border-r border-border bg-panel p-2" aria-label="Node palette">
-      {KINDS.map(({ kind, name, icon }) => (
+    <aside className="panel row-span-3 flex flex-col items-stretch gap-1 overflow-y-auto p-1.5" aria-label="Node palette">
+      {KINDS.map(({ kind, name, icon: Icon }) => (
         <button
           key={kind}
           draggable
@@ -16,12 +16,13 @@ export default function Palette({ onAdd }: { onAdd: (kind: NodeKind) => void }) 
             e.dataTransfer.effectAllowed = 'move'
           }}
           onClick={() => onAdd(kind)}
-          className="flex cursor-grab items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-panel-2"
+          title={`Add ${name.toLowerCase()} (drag onto the canvas, or click)`}
+          className="group flex cursor-grab flex-col items-center gap-1.5 rounded-xl px-1 pt-2.5 pb-2 text-muted transition-colors hover:bg-panel-2 hover:text-text active:cursor-grabbing"
         >
-          <span className="w-4 text-accent" aria-hidden>
-            {icon}
+          <span className="grid size-9 place-items-center rounded-[0.7rem] border border-border bg-panel-2 text-accent transition-[border-color,box-shadow] group-hover:border-accent/40 group-hover:shadow-[0_4px_14px_-4px_rgb(255_106_43/0.55)]">
+            <Icon size={17} strokeWidth={1.75} aria-hidden />
           </span>
-          {name}
+          <span className="text-center text-[10.5px] leading-tight">{name}</span>
         </button>
       ))}
     </aside>

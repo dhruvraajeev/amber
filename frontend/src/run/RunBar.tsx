@@ -1,17 +1,16 @@
+import { LoaderCircle, Play, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { estimateDesignRequests, rateAt } from '../lib/estimate'
 import { count } from '../lib/format'
 import { LIMITS } from '../lib/validate'
 import { useStore } from '../store'
-import { lastPoint } from '../store/runSlice'
 import type { Design, RunConfig } from '../types/contracts'
-import { usePlaybackClock } from './Playback'
 
 const WARMUP_S = 5 // §7.3 default; not exposed in the UI
 
-// The run bar (§11.2): a sketch of the traffic, run length and seed, the request estimate, Run, and
-// playback. Outside a text field, `R` runs and Space plays/pauses. The store ignores a run while one is
+// The run bar (§11.2): a sketch of the traffic, run length and seed, the request estimate, and Run.
+// Playback lives on the canvas (PlaybackBar). Outside a text field, `R` runs and Space plays/pauses. The store ignores a run while one is
 // in flight, so a double click or a held key can't start two.
 export default function RunBar() {
   const { design, status, run, setDrawer, togglePlay } = useStore(
@@ -41,27 +40,30 @@ export default function RunBar() {
   }) // no deps: re-bound each render so `start` always sees the current config
 
   return (
-    <footer className="flex flex-wrap items-center gap-4 border-t border-border bg-panel px-4 py-2 text-sm">
+    <footer className="panel col-span-2 col-start-2 flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3 text-[13px]">
       <Sparkline design={design} durationS={durationS} />
+      <span className="h-8 w-px bg-border" aria-hidden />
       <label className="flex items-center gap-2 text-muted">
         Duration
-        <input
-          type="number" min={LIMITS.minDurationS} max={LIMITS.maxDurationS} value={durationS}
-          onChange={(e) => setDuration(e.target.valueAsNumber)}
-          className="num w-20 rounded border border-border bg-panel-2 px-2 py-1 text-text"
-        />
-        s
+        <span className="field flex h-9 items-center pr-3 focus-within:border-accent focus-within:shadow-[0_0_0_3px_rgb(255_106_43/0.18)]">
+          <input
+            type="number" min={LIMITS.minDurationS} max={LIMITS.maxDurationS} value={durationS}
+            onChange={(e) => setDuration(e.target.valueAsNumber)}
+            className="num w-16 bg-transparent pl-3 text-text outline-none"
+          />
+          <span className="text-muted">s</span>
+        </span>
       </label>
       <label className="flex items-center gap-2 text-muted" title="Same design, duration and seed always give the same result.">
         Seed
         <input
           type="number" step={1} value={seed}
           onChange={(e) => setSeed(e.target.valueAsNumber)}
-          className="num w-20 rounded border border-border bg-panel-2 px-2 py-1 text-text"
+          className="field num h-9 w-20 px-3"
         />
       </label>
-      <span className={`num ${requests > LIMITS.requests ? 'text-warn' : 'text-muted'}`}>
-        {requests > LIMITS.requests && '⚠ '}≈ {Number.isFinite(requests) ? count(requests) : '—'} requests
+      <span className={`num flex items-center gap-1.5 text-xs ${requests > LIMITS.requests ? 'text-warn' : 'text-muted'}`}>
+        {requests > LIMITS.requests && <TriangleAlert size={13} aria-hidden />}≈ {Number.isFinite(requests) ? count(requests) : '—'} requests
       </span>
       <button
         onClick={start}
@@ -69,57 +71,40 @@ export default function RunBar() {
         aria-busy={running}
         aria-keyshortcuts="R"
         title="Run (R)"
-        className="ml-auto rounded bg-accent px-4 py-1.5 font-semibold text-bg hover:bg-accent-2 disabled:cursor-wait disabled:opacity-60"
+        className="btn-primary ml-auto flex h-10 items-center gap-2 pr-5 pl-4 text-[13px] disabled:cursor-wait disabled:opacity-70"
       >
-        {running ? 'Running…' : '▶ Run'}
+        {running ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Play size={14} fill="currentColor" aria-hidden />}
+        {running ? 'Running…' : 'Run'}
+        {!running && <kbd className="num ml-1 rounded border border-black/15 px-1 text-[10px] font-normal text-black/50">R</kbd>}
       </button>
-      <Playback />
     </footer>
   )
 }
 
-/** ‹ ▶ › and a scrubber over the result's timeline (§11.3). The canvas follows the playhead. */
-function Playback() {
-  const { result, playhead, playing, setPlayhead, togglePlay } = useStore(
-    useShallow((s) => ({ result: s.result, playhead: s.playhead, playing: s.playing, setPlayhead: s.setPlayhead, togglePlay: s.togglePlay })),
-  )
-  usePlaybackClock()
-  if (!result) return null
-  const t = result.timeline[playhead]?.t ?? 0
-  const button = 'grid size-7 place-items-center rounded border border-border bg-panel-2 hover:border-accent'
-  return (
-    <div className="flex items-center gap-2" role="group" aria-label="Playback">
-      <button className={button} onClick={() => setPlayhead(playhead - 1)} aria-label="Step back">‹</button>
-      <button className={button} onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'} aria-keyshortcuts="Space" title="Play/pause (Space)">
-        {playing ? '▮▮' : '▶'}
-      </button>
-      <button className={button} onClick={() => setPlayhead(playhead + 1)} aria-label="Step forward">›</button>
-      <input
-        type="range" min={0} max={lastPoint(result)} value={playhead}
-        onChange={(e) => setPlayhead(e.target.valueAsNumber)}
-        aria-label="Timeline position" aria-valuetext={`${t} seconds`}
-        className="w-40 accent-accent"
-      />
-      <span className="num w-20 text-xs text-muted">{t} / {result.config.durationS} s</span>
-    </div>
-  )
-}
-
-/** Total arrival rate over the run, as a tiny line: the "traffic ▁▂▅▇▅▂" in §11.2. */
+/** Total arrival rate over the run, as a small lit area: the "traffic ▁▂▅▇▅▂" in §11.2. */
 function Sparkline({ design, durationS }: { design: Design; durationS: number }) {
   const users = design.nodes.flatMap((n) => (n.kind === 'users' ? [n.params.traffic] : []))
   if (!users.length || !(durationS > 0)) return null
   const N = 48
   const rates = Array.from({ length: N + 1 }, (_, i) => users.reduce((s, t) => s + rateAt(t, (i / N) * durationS, durationS), 0))
   const peak = Math.max(...rates) || 1
-  const points = rates.map((r, i) => `${(i / N) * 100},${20 - (r / peak) * 18}`).join(' ')
+  const line = rates.map((r, i) => `${(i / N) * 100},${22 - (r / peak) * 13}`).join(' ') // headroom, so flat traffic reads as a line
   return (
-    <span className="flex items-center gap-2 text-muted">
-      Traffic
-      <svg viewBox="0 0 100 20" preserveAspectRatio="none" className="h-5 w-24" role="img" aria-label={`Traffic peaks at ${count(peak)} requests per second`}>
-        <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+    <span className="flex items-center gap-3">
+      <span className="flex flex-col leading-tight">
+        <span className="text-xs text-muted">Traffic</span>
+        <span className="num text-xs">≤ {count(peak)} req/s</span>
+      </span>
+      <svg viewBox="0 0 100 24" preserveAspectRatio="none" className="h-8 w-28" role="img" aria-label={`Traffic peaks at ${count(peak)} requests per second`}>
+        <defs>
+          <linearGradient id="spark-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" style={{ stopColor: 'var(--accent)', stopOpacity: 0.22 }} />
+            <stop offset="1" style={{ stopColor: 'var(--accent)', stopOpacity: 0 }} />
+          </linearGradient>
+        </defs>
+        <polygon points={`0,24 ${line} 100,24`} fill="url(#spark-fill)" />
+        <polyline points={line} fill="none" stroke="var(--accent)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
       </svg>
-      <span className="num text-xs">≤ {count(peak)} req/s</span>
     </span>
   )
 }

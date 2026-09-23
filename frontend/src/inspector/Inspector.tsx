@@ -1,3 +1,4 @@
+import { CircleCheck, TriangleAlert } from 'lucide-react'
 import { KINDS, type NodeData } from '../canvas/map'
 import type { DesignNode, ValidationIssue } from '../types/contracts'
 import { TextField, type Errors } from './fields'
@@ -15,7 +16,7 @@ export default function Inspector({ node, issues, onChange }: {
   node?: DesignNode; issues: ValidationIssue[]; onChange: (id: string, patch: Partial<NodeData>) => void
 }) {
   return (
-    <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto border-l border-border bg-panel p-3" aria-label="Inspector">
+    <aside className="panel flex min-h-0 flex-col gap-3.5 overflow-y-auto p-4" aria-label="Inspector">
       {node ? <NodeInspector node={node} issues={issues.filter((i) => i.nodeId === node.id)} onChange={onChange} /> : <DesignIssues issues={issues} />}
     </aside>
   )
@@ -24,9 +25,14 @@ export default function Inspector({ node, issues, onChange }: {
 function DesignIssues({ issues }: { issues: ValidationIssue[] }) {
   return (
     <>
-      <h2 className="text-sm font-semibold">Design check</h2>
+      <h2 className="text-[15px] font-semibold">Design check</h2>
       {issues.length === 0 ? (
-        <p className="text-sm text-muted">✓ No problems found. Select a node to edit its parameters.</p>
+        <div className="flex gap-3 rounded-xl border border-border bg-panel-2 p-3.5 text-[13px] text-muted">
+          <CircleCheck size={18} className="mt-px shrink-0 text-ok" aria-hidden />
+          <p>
+            <span className="text-text">No problems found.</span> Select a node to edit its parameters.
+          </p>
+        </div>
       ) : (
         <IssueList issues={issues} />
       )}
@@ -36,10 +42,11 @@ function DesignIssues({ issues }: { issues: ValidationIssue[] }) {
 
 function IssueList({ issues }: { issues: ValidationIssue[] }) {
   return (
-    <ul className="flex flex-col gap-2 text-sm" aria-label={`${issues.length} issues`}>
+    <ul className="flex flex-col gap-2 text-[13px]" aria-label={`${issues.length} issues`}>
       {issues.map((i, n) => (
-        <li key={n} className="rounded border border-crit bg-panel-2 px-2 py-1.5">
-          <span className="text-warn">⚠</span> {i.message}
+        <li key={n} className="flex gap-2.5 rounded-xl border border-crit/40 bg-crit/[0.07] px-3 py-2.5 leading-snug">
+          <TriangleAlert size={15} className="mt-0.5 shrink-0 text-warn" aria-hidden />
+          {i.message}
         </li>
       ))}
     </ul>
@@ -53,13 +60,18 @@ function NodeInspector({ node: d, issues, onChange }: { node: DesignNode; issues
   const byPath = new Map(issues.filter((i) => i.path).map((i) => [i.path!.replace(/^params\./, ''), short(i.message)]))
   const err: Errors = (path) => byPath.get(path)
   const graphIssues = issues.filter((i) => !i.path)
-  const { name, icon } = KINDS.find((k) => k.kind === d.kind)!
+  const { name, icon: Icon } = KINDS.find((k) => k.kind === d.kind)!
 
   return (
     <>
-      <h2 className="flex items-center gap-2 text-sm font-semibold">
-        <span className="text-accent" aria-hidden>{icon}</span>
-        {name}
+      <h2 className="flex items-center gap-3 border-b border-border pb-3.5">
+        <span className="grid size-9 place-items-center rounded-[0.7rem] border border-accent/25 bg-accent/10 text-accent shadow-[0_6px_18px_-8px_rgb(255_106_43/0.7)]">
+          <Icon size={17} strokeWidth={1.75} aria-hidden />
+        </span>
+        <span className="flex flex-col">
+          <span className="text-[15px] font-semibold leading-tight">{name}</span>
+          <span className="num text-[11px] text-muted">{d.id}</span>
+        </span>
       </h2>
       {graphIssues.length > 0 && <IssueList issues={graphIssues} />}
       <TextField label="Label" help="The name shown on the canvas and in results." value={d.label} onChange={(label) => onChange(d.id, { label })} />

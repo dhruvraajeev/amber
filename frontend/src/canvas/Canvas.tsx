@@ -16,6 +16,8 @@ import { validate } from '../lib/validate'
 import { useStore } from '../store'
 import type { NodeKind } from '../types/contracts'
 import CostTicker from './CostTicker'
+import PlaybackBar from '../run/PlaybackBar'
+import RunStatus from './RunStatus'
 import TrafficEdge from './edges/TrafficEdge'
 import { toFlowEdge, toFlowNode, type FlowEdge, type FlowNode } from './map'
 import NodeCard from './nodes/NodeCard'
@@ -113,7 +115,7 @@ function Flow() {
       <Palette onAdd={add} />
       <main
         ref={pane}
-        className="relative min-h-0 bg-bg"
+        className="panel hud-corners relative min-h-0 overflow-hidden"
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
         onKeyDown={(e) => e.key === 'Escape' && select(null)}
@@ -134,11 +136,14 @@ function Flow() {
           snapGrid={[GRID, GRID]}
           colorMode="dark"
           fitView
+          fitViewOptions={{ padding: 0.3, maxZoom: 1.1 }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={GRID} size={1.5} />
-          <Controls showInteractive={false} />
+          <Background variant={BackgroundVariant.Dots} gap={GRID} size={1.2} />
+          <Controls showInteractive={false} position="bottom-left" />
         </ReactFlow>
+        <RunStatus nodes={design.nodes.length} edges={design.edges.length} />
         <CostTicker />
+        <PlaybackBar />
       </main>
       <Inspector node={node} issues={issues} onChange={updateNode} />
     </>
