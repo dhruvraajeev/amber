@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { getTemplates } from './api/api'
 import Canvas from './canvas/Canvas'
+import Dashboard from './dashboard/Dashboard'
 import { BLANK } from './canvas/map'
 import EmptyState from './layout/EmptyState'
 import TopBar from './layout/TopBar'
+import RunBar from './run/RunBar'
 import { useStore } from './store'
 import type { Design } from './types/contracts'
 
@@ -46,7 +48,7 @@ export default function App() {
         </select>
       </TopBar>
 
-      <div className="grid min-h-0 grid-cols-[10rem_minmax(0,1fr)_18rem]">
+      <div className="grid min-h-0 grid-cols-[10rem_minmax(0,1fr)_18rem] overflow-hidden">
         {hasDesign ? (
           <Canvas key={loads} />
         ) : (
@@ -61,12 +63,8 @@ export default function App() {
         )}
       </div>
 
-      <footer className="border-t border-border bg-panel px-4 py-2 text-sm text-muted">
-        Run controls appear here once a design is ready.
-      </footer>
-      <section className="h-32 border-t border-border bg-panel px-4 py-2 text-sm text-muted">
-        Run a simulation to see results.
-      </section>
+      {hasDesign && <RunBar />}
+      {hasDesign && <Dashboard />}
     </div>
   )
 }

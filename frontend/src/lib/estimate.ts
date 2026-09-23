@@ -9,6 +9,13 @@ function overlapS(startS: number, lengthS: number, durationS: number): number {
   return Math.max(0, Math.min(startS + lengthS, durationS) - startS)
 }
 
+/** Arrival rate (req/s) of one users node at second `s` of a run lasting `durationS`. */
+export function rateAt(t: TrafficProfile, s: number, durationS: number): number {
+  if (t.type === 'constant') return t.rps
+  if (t.type === 'spike') return s >= t.peakStartS && s < t.peakStartS + t.peakDurationS ? t.peakRps : t.baseRps
+  return t.startRps + ((t.endRps - t.startRps) * s) / durationS
+}
+
 /** Requests one users node sends over a run of `durationS` seconds. */
 export function estimateRequests(traffic: TrafficProfile, durationS: number): number {
   switch (traffic.type) {

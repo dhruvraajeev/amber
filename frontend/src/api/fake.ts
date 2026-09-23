@@ -7,7 +7,8 @@ import gpus from '@shared/presets/gpus.json'
 import hostedLlms from '@shared/presets/hosted_llms.json'
 import models from '@shared/presets/models.json'
 import { designHash } from '../canvas/map'
-import type { Design, DesignEdge, DesignNode, LatencyDist, RunConfig, RunResult, TimelinePoint, TrafficProfile } from '../types/contracts'
+import { rateAt } from '../lib/estimate'
+import type { Design, DesignEdge, DesignNode, LatencyDist, RunConfig, RunResult, TimelinePoint } from '../types/contracts'
 
 export async function fakeSimulate(design: Design, config: RunConfig): Promise<RunResult> {
   const result = fakeResult(design, config, await designHash(design))
@@ -222,7 +223,7 @@ function describe(n: DesignNode, out: DesignEdge[]): NodeModel {
 function monthlyCost(n: DesignNode, rps: number): { usd: number; detail: string } {
   switch (n.kind) {
     case 'service':
-      return { usd: n.params.replicas * n.params.costPerReplicaMonth, detail: `${n.params.replicas} replicas × $${n.params.costPerReplicaMonth}/mo` }
+      return { usd: n.params.replicas * n.params.costPerReplicaMonth, detail: `${plural(n.params.replicas, 'replica')} × $${n.params.costPerReplicaMonth}/mo` }
     case 'cache':
     case 'database':
       return { usd: n.params.costPerMonth, detail: 'flat monthly price' }
@@ -288,12 +289,6 @@ function topoOrder(nodes: DesignNode[], out: Map<string, DesignEdge[]>): DesignN
   return order
 }
 
-function rateAt(t: TrafficProfile, s: number, durationS: number): number {
-  if (t.type === 'constant') return t.rps
-  if (t.type === 'spike') return s >= t.peakStartS && s < t.peakStartS + t.peakDurationS ? t.peakRps : t.baseRps
-  return t.startRps + ((t.endRps - t.startRps) * s) / durationS
-}
-
 /** Tiny seeded PRNG: uniform [0, 1) from a 32-bit seed. */
 function mulberry32(seed: number): () => number {
   return () => {
@@ -317,5 +312,6 @@ function waitFactor(util: number, slots: number): number {
 
 /** p95 isn't modeled separately: it sits 70% of the way from p50 to p99. */
 const spread = (p50: number, p99: number) => ({ p50, p95: p50 + 0.7 * (p99 - p50), p99 })
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / (xs.length || 1)
 const pct = (xs: number[], q: number) => [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(q * xs.length))] ?? 0
