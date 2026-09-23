@@ -1,4 +1,5 @@
 import { type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
 import { count, ms, pct, rps, usd } from '../lib/format'
 import { useStore } from '../store'
@@ -25,12 +26,13 @@ const MIN_HEIGHT = 120
 // The results drawer (§11.2): tabs over the latest RunResult. Drag or arrow-key the top edge to resize.
 // While a new run is in flight (or was refused) the previous result stays up, dimmed, so the layout doesn't jump.
 export default function Dashboard() {
-  const { status, result, issues, open, height, tab, setDrawer, setTab, select, design } = useStore(
+  const { status, result, issues, open, height, tab, setDrawer, setTab, select, design, pinned, pin } = useStore(
     useShallow((s) => ({
       status: s.status, result: s.result, issues: s.issues, open: s.drawerOpen, height: s.drawerHeight,
-      tab: s.tab, setDrawer: s.setDrawer, setTab: s.setTab, select: s.select, design: s.design,
+      tab: s.tab, setDrawer: s.setDrawer, setTab: s.setTab, select: s.select, design: s.design, pinned: s.pinned, pin: s.pin,
     })),
   )
+  const isPinned = !!result && pinned.includes(result)
   // Results name nodes by id; show the current label, or the id if the node has since been deleted.
   const label = (id: string) => design?.nodes.find((n) => n.id === id)?.label ?? id
   const resize = (h: number) => setDrawer({ height: Math.round(Math.max(MIN_HEIGHT, Math.min(window.innerHeight * 0.7, h))) })
@@ -71,13 +73,26 @@ export default function Dashboard() {
             {t.name}
           </button>
         ))}
-        <button
-          onClick={() => setDrawer({ open: !open })}
-          aria-expanded={open}
-          className="ml-auto px-2 text-sm text-muted hover:text-text"
-        >
-          {open ? 'Hide ▾' : 'Show ▴'}
-        </button>
+        <div className="ml-auto flex items-center text-sm whitespace-nowrap">
+          {result && status === 'done' && (
+            <button
+              onClick={pin}
+              disabled={isPinned}
+              title="Keep this run to compare against another (the last two pins are kept)"
+              className="px-2 text-accent hover:text-accent-2 disabled:text-muted"
+            >
+              {isPinned ? 'Pinned' : 'Pin for compare'}
+            </button>
+          )}
+          {pinned.length === 2 && (
+            <Link to="/compare" className="px-2 text-accent hover:text-accent-2">
+              Compare →
+            </Link>
+          )}
+          <button onClick={() => setDrawer({ open: !open })} aria-expanded={open} className="px-2 text-muted hover:text-text">
+            {open ? 'Hide ▾' : 'Show ▴'}
+          </button>
+        </div>
       </div>
       {open && (
         <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-4">

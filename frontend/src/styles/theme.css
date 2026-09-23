@@ -101,7 +101,7 @@ body {
 
 /* Nodes and edges named by a validation issue (§7.5): rust border plus a ⚠ badge / dashes, so it's not hue alone. */
 .react-flow__node.invalid > div {
-  border-color: var(--crit);
+  border-color: var(--crit) !important; /* over the load color NodeCard sets inline */
 }
 .react-flow__node.invalid::after {
   content: "⚠";
@@ -111,7 +111,20 @@ body {
   font-size: 0.75rem;
   color: var(--warn);
 }
+.react-flow__edge-path.erroring {
+  stroke: var(--crit);
+}
 .react-flow__edge.invalid .react-flow__edge-path {
   stroke: var(--crit);
   stroke-dasharray: 4 3;
+}
+
+/* Reduced motion (§11.3): no traveling dots; after a run, edges are static dashes whose thickness is throughput. */
+@media (prefers-reduced-motion: reduce) {
+  .traffic-dots {
+    display: none;
+  }
+  .react-flow__edge-path.traffic {
+    stroke-dasharray: 6 4;
+  }
 }

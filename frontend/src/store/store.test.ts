@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import classic from '@shared/templates/classic-web-app.json'
 import agent from '@shared/templates/agent-self-hosted.json'
 import { BLANK } from '../canvas/map'
-import type { Design } from '../types/contracts'
+import type { Design, RunResult } from '../types/contracts'
 
 // The store autosaves to localStorage, so each test gets a fresh in-memory one and a fresh store.
 const saved = new Map<string, string>()
@@ -87,5 +87,20 @@ describe('run slice', () => {
       s.getState().pin()
     }
     expect(s.getState().pinned).toHaveLength(2)
+  })
+
+  it('clamps the playhead and replays from the start once at the end', async () => {
+    const s = await fresh()
+    const timeline = [0, 1, 2].map((t) => ({ t })) as unknown as RunResult['timeline']
+    s.setState({ result: { timeline } as RunResult })
+    s.getState().setPlayhead(9)
+    expect(s.getState().playhead).toBe(2)
+    s.getState().setPlayhead(-1)
+    expect(s.getState().playhead).toBe(0)
+    s.getState().setPlayhead(2)
+    s.getState().togglePlay()
+    expect(s.getState()).toMatchObject({ playing: true, playhead: 0 })
+    s.getState().togglePlay()
+    expect(s.getState().playing).toBe(false)
   })
 })

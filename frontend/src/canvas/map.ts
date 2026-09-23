@@ -15,7 +15,7 @@ export type FlowEdge = Edge<{ role?: DesignEdge['role'] }>
 
 // One way only: the store holds the Design, and the canvas renders it through this.
 export const toFlowNode = ({ id, position, ...data }: DesignNode): FlowNode => ({ id, position, type: data.kind, data: data as NodeData })
-export const toFlowEdge = ({ id, source, target, role }: DesignEdge): FlowEdge => ({ id, source, target, data: { role }, label: role })
+export const toFlowEdge = ({ id, source, target, role }: DesignEdge): FlowEdge => ({ id, source, target, type: 'traffic', data: { role }, label: role })
 
 // Canonical JSON (§7.4): sorted keys, no positions, no undefined fields. Moving a node never changes it.
 // The backend must produce byte-identical output (see docs/decisions.md).

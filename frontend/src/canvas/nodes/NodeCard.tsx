@@ -1,24 +1,54 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { hasCapacity, loadColor, loadGlow } from '../../lib/color'
+import { level, LEVEL_ICON, pct, rps } from '../../lib/format'
+import { useNodeLoad } from '../../run/Playback'
+import { useStore } from '../../store'
 import { KINDS, type FlowNode, type NodeData } from '../map'
 
-// One card for all seven kinds (§11.3): icon + label + one key line.
-// Before a run the key line summarizes params; Step 8 swaps in live metrics and load glow.
-export default function NodeCard({ data, selected }: NodeProps<FlowNode>) {
+// One card for all seven kinds (§11.3): icon + label + one key line. Before a run the key line
+// summarizes params; after, it shows load at the playhead, and the border and glow follow utilization.
+// A node named by a warning or critical bottleneck gets a pulsing "!" badge.
+export default function NodeCard({ id, data, selected }: NodeProps<FlowNode>) {
   const { icon } = KINDS.find((k) => k.kind === data.kind)!
+  const load = useNodeLoad(id)
+  const bottleneck = useStore((s) => s.result?.bottlenecks.some((b) => b.nodeId === id && b.severity !== 'info'))
+  const glows = load && hasCapacity(data.kind) && !selected // the selection ring wins over the glow
   return (
     <div
-      className={`min-w-36 rounded-md border bg-panel px-3 py-2 ${selected ? 'border-accent ring-2 ring-accent/40' : 'border-border'}`}
+      className={`relative min-w-36 rounded-md border bg-panel px-3 py-2 ${selected ? 'border-accent ring-2 ring-accent/40' : 'border-border'}`}
+      style={glows ? { borderColor: loadColor(load.util), boxShadow: loadGlow(load.util) } : undefined}
     >
       {data.kind !== 'users' && <Handle type="target" position={Position.Left} />}
+      {bottleneck && (
+        <span
+          title="Bottleneck: see the Bottlenecks tab"
+          className="absolute -top-2 -left-2 grid size-4 place-items-center rounded-full bg-crit text-[10px] font-bold text-text motion-safe:animate-pulse"
+        >
+          !
+        </span>
+      )}
       <div className="flex items-center gap-2">
         <span className="text-accent" aria-hidden>
           {icon}
         </span>
         <span className="text-sm font-semibold">{data.label}</span>
       </div>
-      <div className="num mt-1 text-xs text-muted">{keyLine(data)}</div>
+      <div className="num mt-1 text-xs text-muted">
+        {load ? <LoadLine util={hasCapacity(data.kind) ? load.util : undefined} throughput={load.throughputRps} /> : keyLine(data)}
+      </div>
       {data.kind !== 'database' && data.kind !== 'llm' && <Handle type="source" position={Position.Right} />}
     </div>
+  )
+}
+
+/** "▲ 72% · 140 req/s": the icon repeats the load level, so it isn't carried by color alone. */
+function LoadLine({ util, throughput }: { util?: number; throughput: number }) {
+  if (util === undefined) return rps(throughput)
+  const lv = level(util)
+  return (
+    <>
+      <span style={{ color: `var(--${lv})` }} aria-hidden>{LEVEL_ICON[lv]}</span> {pct(util)} · {rps(throughput)}
+    </>
   )
 }
 

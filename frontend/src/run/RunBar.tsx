@@ -4,16 +4,18 @@ import { estimateDesignRequests, rateAt } from '../lib/estimate'
 import { count } from '../lib/format'
 import { LIMITS } from '../lib/validate'
 import { useStore } from '../store'
+import { lastPoint } from '../store/runSlice'
 import type { Design, RunConfig } from '../types/contracts'
+import { usePlaybackClock } from './Playback'
 
 const WARMUP_S = 5 // §7.3 default; not exposed in the UI
 
-// The run bar (§11.2): a sketch of the traffic, run length and seed, the request estimate, and Run.
-// `R` anywhere outside a text field runs too. The store ignores a run while one is in flight, so a
-// double click or a held key can't start two.
+// The run bar (§11.2): a sketch of the traffic, run length and seed, the request estimate, Run, and
+// playback. Outside a text field, `R` runs and Space plays/pauses. The store ignores a run while one is
+// in flight, so a double click or a held key can't start two.
 export default function RunBar() {
-  const { design, status, run, setDrawer } = useStore(
-    useShallow((s) => ({ design: s.design!, status: s.status, run: s.run, setDrawer: s.setDrawer })),
+  const { design, status, run, setDrawer, togglePlay } = useStore(
+    useShallow((s) => ({ design: s.design!, status: s.status, run: s.run, setDrawer: s.setDrawer, togglePlay: s.togglePlay })),
   )
   const [durationS, setDuration] = useState(60)
   const [seed, setSeed] = useState(42)
@@ -28,10 +30,11 @@ export default function RunBar() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement
-      if (e.key !== 'r' && e.key !== 'R') return
       if (e.metaKey || e.ctrlKey || e.altKey || t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return
+      if (e.key === 'r' || e.key === 'R') start()
+      else if (e.key === ' ' && t.tagName !== 'BUTTON') togglePlay() // a focused button already clicks on Space
+      else return
       e.preventDefault()
-      start()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -70,7 +73,35 @@ export default function RunBar() {
       >
         {running ? 'Running…' : '▶ Run'}
       </button>
+      <Playback />
     </footer>
+  )
+}
+
+/** ‹ ▶ › and a scrubber over the result's timeline (§11.3). The canvas follows the playhead. */
+function Playback() {
+  const { result, playhead, playing, setPlayhead, togglePlay } = useStore(
+    useShallow((s) => ({ result: s.result, playhead: s.playhead, playing: s.playing, setPlayhead: s.setPlayhead, togglePlay: s.togglePlay })),
+  )
+  usePlaybackClock()
+  if (!result) return null
+  const t = result.timeline[playhead]?.t ?? 0
+  const button = 'grid size-7 place-items-center rounded border border-border bg-panel-2 hover:border-accent'
+  return (
+    <div className="flex items-center gap-2" role="group" aria-label="Playback">
+      <button className={button} onClick={() => setPlayhead(playhead - 1)} aria-label="Step back">‹</button>
+      <button className={button} onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'} aria-keyshortcuts="Space" title="Play/pause (Space)">
+        {playing ? '▮▮' : '▶'}
+      </button>
+      <button className={button} onClick={() => setPlayhead(playhead + 1)} aria-label="Step forward">›</button>
+      <input
+        type="range" min={0} max={lastPoint(result)} value={playhead}
+        onChange={(e) => setPlayhead(e.target.valueAsNumber)}
+        aria-label="Timeline position" aria-valuetext={`${t} seconds`}
+        className="w-40 accent-accent"
+      />
+      <span className="num w-20 text-xs text-muted">{t} / {result.config.durationS} s</span>
+    </div>
   )
 }
 

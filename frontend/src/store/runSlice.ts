@@ -11,13 +11,13 @@ export interface RunSlice {
   status: RunStatus
   result: RunResult | null
   issues: ValidationIssue[]
-  pinned: RunResult[] // the two most recent pins, oldest first (Compare, Step 8)
-  playhead: number // index into result.timeline
+  pinned: RunResult[] // the two most recent pins, oldest first (Compare)
+  playhead: number // index into result.timeline; the canvas shows this moment
   playing: boolean
   run: (config: RunConfig) => Promise<void>
   pin: () => void
-  setPlayhead: (i: number) => void
-  setPlaying: (playing: boolean) => void
+  setPlayhead: (i: number) => void // clamped to the timeline
+  togglePlay: () => void // play from the start again once at the end
 }
 
 export const runSlice: StateCreator<Store, [], [], RunSlice> = (set, get) => ({
@@ -45,6 +45,12 @@ export const runSlice: StateCreator<Store, [], [], RunSlice> = (set, get) => ({
     const { result, pinned } = get()
     if (result && !pinned.includes(result)) set({ pinned: [...pinned, result].slice(-2) })
   },
-  setPlayhead: (playhead) => set({ playhead }),
-  setPlaying: (playing) => set({ playing }),
+  setPlayhead: (i) => set((s) => ({ playhead: Math.max(0, Math.min(i, lastPoint(s.result))) })),
+  togglePlay: () =>
+    set((s) => {
+      if (s.playing || !s.result) return { playing: false }
+      return { playing: true, playhead: s.playhead >= lastPoint(s.result) ? 0 : s.playhead }
+    }),
 })
+
+export const lastPoint = (result: RunResult | null) => Math.max(0, (result?.timeline.length ?? 0) - 1)

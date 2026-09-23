@@ -1,12 +1,12 @@
+import { hasCapacity } from '../lib/color'
 import { count, level, LEVEL_ICON, pct } from '../lib/format'
 import type { RunResult } from '../types/contracts'
 
 // Average utilization per node, busiest first, with a tick at its peak. The bar's color, icon and
 // text all say the load level, so hue is never the only signal. Kinds without a capacity limit are left out.
-const UNBOUNDED = new Set(['users', 'loadBalancer', 'cache', 'agent'])
 
 export default function LoadBars({ result, label }: { result: RunResult; label: (id: string) => string }) {
-  const rows = result.nodes.filter((n) => !UNBOUNDED.has(n.kind)).sort((a, b) => b.utilAvg - a.utilAvg)
+  const rows = result.nodes.filter((n) => hasCapacity(n.kind)).sort((a, b) => b.utilAvg - a.utilAvg)
   if (!rows.length) return <p className="text-sm text-muted">No nodes with capacity to measure.</p>
   const top = rows[0]
   return (

@@ -15,6 +15,8 @@ import Inspector from '../inspector/Inspector'
 import { validate } from '../lib/validate'
 import { useStore } from '../store'
 import type { NodeKind } from '../types/contracts'
+import CostTicker from './CostTicker'
+import TrafficEdge from './edges/TrafficEdge'
 import { toFlowEdge, toFlowNode, type FlowEdge, type FlowNode } from './map'
 import NodeCard from './nodes/NodeCard'
 import Palette, { DRAG_MIME } from './Palette'
@@ -22,6 +24,8 @@ import Palette, { DRAG_MIME } from './Palette'
 const nodeTypes = Object.fromEntries(
   (['users', 'loadBalancer', 'service', 'cache', 'database', 'agent', 'llm'] satisfies NodeKind[]).map((k) => [k, NodeCard]),
 )
+
+const edgeTypes = { traffic: TrafficEdge }
 
 const GRID = 20
 
@@ -109,7 +113,7 @@ function Flow() {
       <Palette onAdd={add} />
       <main
         ref={pane}
-        className="min-h-0 bg-bg"
+        className="relative min-h-0 bg-bg"
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
         onKeyDown={(e) => e.key === 'Escape' && select(null)}
@@ -118,12 +122,14 @@ function Flow() {
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={(c) => connect(c.source, c.target)}
           isValidConnection={(c) => c.source !== c.target}
           deleteKeyCode={['Delete', 'Backspace']}
           multiSelectionKeyCode={null}
+          panActivationKeyCode={null} // Space toggles playback instead; dragging the pane still pans
           snapToGrid
           snapGrid={[GRID, GRID]}
           colorMode="dark"
@@ -132,6 +138,7 @@ function Flow() {
           <Background variant={BackgroundVariant.Dots} gap={GRID} size={1.5} />
           <Controls showInteractive={false} />
         </ReactFlow>
+        <CostTicker />
       </main>
       <Inspector node={node} issues={issues} onChange={updateNode} />
     </>
