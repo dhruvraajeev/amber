@@ -41,13 +41,15 @@ export default function App() {
         {loaded ? (
           <Canvas key={loaded.key} design={loaded.design} />
         ) : (
-          <main className="col-span-2 min-h-0 bg-bg">
-            <EmptyState templates={templates} onPick={load} />
-          </main>
+          <>
+            <main className="col-span-2 min-h-0 bg-bg">
+              <EmptyState templates={templates} onPick={load} />
+            </main>
+            <aside className="border-l border-border bg-panel p-3 text-sm text-muted">
+              Select a node to edit its parameters.
+            </aside>
+          </>
         )}
-        <aside className="border-l border-border bg-panel p-3 text-sm text-muted">
-          Select a node to edit its parameters.
-        </aside>
       </div>
 
       <footer className="border-t border-border bg-panel px-4 py-2 text-sm text-muted">

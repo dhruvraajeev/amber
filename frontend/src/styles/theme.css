@@ -98,3 +98,20 @@ body {
 .react-flow .react-flow__attribution a {
   color: var(--muted);
 }
+
+/* Nodes and edges named by a validation issue (§7.5): rust border plus a ⚠ badge / dashes, so it's not hue alone. */
+.react-flow__node.invalid > div {
+  border-color: var(--crit);
+}
+.react-flow__node.invalid::after {
+  content: "⚠";
+  position: absolute;
+  top: -0.6rem;
+  right: -0.5rem;
+  font-size: 0.75rem;
+  color: var(--warn);
+}
+.react-flow__edge.invalid .react-flow__edge-path {
+  stroke: var(--crit);
+  stroke-dasharray: 4 3;
+}

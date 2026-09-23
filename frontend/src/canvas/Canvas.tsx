@@ -11,9 +11,11 @@ import {
   type Connection,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useRef, useState, type DragEvent } from 'react'
+import { useMemo, useRef, useState, type DragEvent } from 'react'
 import type { Design, NodeKind } from '../types/contracts'
-import { newNode, toFlow, type FlowEdge, type FlowNode } from './map'
+import Inspector from '../inspector/Inspector'
+import { validate } from '../lib/validate'
+import { newNode, toDesign, toFlow, type FlowEdge, type FlowNode, type NodeData } from './map'
 import NodeCard from './nodes/NodeCard'
 import Palette, { DRAG_MIME } from './Palette'
 
@@ -23,7 +25,7 @@ const nodeTypes = Object.fromEntries(
 
 const GRID = 20
 
-// Renders two layout cells: the palette column and the React Flow pane.
+// Renders three layout cells: the palette column, the React Flow pane, and the inspector.
 // Holds the graph locally for now; Step 6 moves it into the Zustand design slice.
 export default function Canvas({ design }: { design: Design }) {
   return (
@@ -39,6 +41,13 @@ function Flow({ design }: { design: Design }) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>(initial.edges)
   const { screenToFlowPosition } = useReactFlow()
   const pane = useRef<HTMLDivElement>(null)
+
+  // Re-checked on every edit; ≤50 nodes keeps this cheap. Flagged nodes and edges get an `invalid` class.
+  const issues = useMemo(() => validate(toDesign(design, nodes, edges)), [design, nodes, edges])
+  const flagged = new Set(issues.flatMap((i) => [i.nodeId, i.edgeId]))
+  const mark = <T extends { id: string }>(xs: T[]) => xs.map((x) => (flagged.has(x.id) ? { ...x, className: 'invalid' } : x))
+  const selected = nodes.filter((n) => n.selected)
+  const update = (id: string, data: NodeData) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data } : n)))
 
   const add = (kind: NodeKind, screen?: { x: number; y: number }) => {
     let position
@@ -89,8 +98,8 @@ function Flow({ design }: { design: Design }) {
         }}
       >
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={mark(nodes)}
+          edges={mark(edges)}
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
@@ -106,6 +115,7 @@ function Flow({ design }: { design: Design }) {
           <Controls showInteractive={false} />
         </ReactFlow>
       </main>
+      <Inspector node={selected.length === 1 ? selected[0] : undefined} issues={issues} onChange={update} />
     </>
   )
 }

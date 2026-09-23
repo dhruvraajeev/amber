@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react'
 import hostedLlms from '@shared/presets/hosted_llms.json'
-import type { Design, DesignEdge, DesignNode, NodeKind, NodeParamsByKind } from '../types/contracts'
+import type { Design, DesignEdge, DesignNode, LlmParams, NodeKind, NodeParamsByKind } from '../types/contracts'
 
 export const BLANK: Design = { name: 'Untitled design', version: 1, nodes: [], edges: [] }
 
@@ -63,6 +63,19 @@ export const KINDS: { kind: NodeKind; name: string; icon: string }[] = [
 ]
 
 const llmPreset = hostedLlms[0]
+// The inspector swaps between these when the LLM mode changes.
+export const LLM_DEFAULTS: { [M in LlmParams['mode']]: Extract<LlmParams, { mode: M }> } = {
+  hosted: {
+    mode: 'hosted', presetId: llmPreset.id, ttft: llmPreset.ttft, tokensPerSecond: llmPreset.tokensPerSecond,
+    inputUsdPer1M: llmPreset.inputUsdPer1M, outputUsdPer1M: llmPreset.outputUsdPer1M,
+    rateLimitRpm: llmPreset.rateLimitRpm, maxRetries: 2,
+  },
+  selfHosted: {
+    mode: 'selfHosted', gpuPresetId: 'nvidia-l4-24gb', modelPresetId: 'llama-3.1-8b-instruct-fp16', profileId: 'default',
+    replicas: 1, maxBatchSize: 32, maxBatchTokens: 4096, maxOutputTokensReserve: 512,
+    speculative: { enabled: false, draftTokens: 4, acceptanceRate: 0.7, draftStepMs: 3 },
+  },
+}
 const DEFAULTS: { [K in NodeKind]: NodeParamsByKind[K] } = {
   users: { traffic: { type: 'constant', rps: 50 }, clientTimeoutMs: 5000 },
   loadBalancer: { algorithm: 'roundRobin', overhead: { p50Ms: 1, p99Ms: 3 } },
@@ -73,11 +86,7 @@ const DEFAULTS: { [K in NodeKind]: NodeParamsByKind[K] } = {
     llmCallsMean: 3, toolCallsPerStep: 1, toolLatency: { p50Ms: 100, p99Ms: 500 },
     basePromptTokens: 1000, contextGrowthTokensPerStep: 300, outputTokensPerCall: 200,
   },
-  llm: {
-    mode: 'hosted', presetId: llmPreset.id, ttft: llmPreset.ttft, tokensPerSecond: llmPreset.tokensPerSecond,
-    inputUsdPer1M: llmPreset.inputUsdPer1M, outputUsdPer1M: llmPreset.outputUsdPer1M,
-    rateLimitRpm: llmPreset.rateLimitRpm, maxRetries: 2,
-  },
+  llm: LLM_DEFAULTS.hosted,
 }
 
 export function newNode(kind: NodeKind, position: { x: number; y: number }, taken: Set<string>): FlowNode {
