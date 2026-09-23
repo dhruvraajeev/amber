@@ -1,21 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import template from '@shared/templates/agent-self-hosted.json'
 import type { Design } from '../types/contracts'
-import { canonicalDesign, designHash, KINDS, newNode, toDesign, toFlow } from './map'
+import { canonicalDesign, designHash, KINDS, newNode, toFlowEdge, toFlowNode } from './map'
 
 const design = template as Design
 
-describe('design ↔ React Flow mapping', () => {
-  it('round-trips a template unchanged', () => {
-    const { nodes, edges } = toFlow(design)
-    expect(toDesign(design, nodes, edges)).toEqual(design)
+describe('design → React Flow mapping', () => {
+  it('keeps id, position and the rest as node data', () => {
+    const { id, position, ...data } = design.nodes[0]
+    expect(toFlowNode(design.nodes[0])).toEqual({ id, position, type: data.kind, data })
   })
 
-  it('keeps edge roles and drops absent ones', () => {
-    const { nodes, edges } = toFlow(design)
-    const out = toDesign(design, nodes, edges).edges
-    expect(out.filter((e) => e.role).length).toBe(design.edges.filter((e) => e.role).length)
-    expect(out.every((e) => 'role' in e === (e.role !== undefined))).toBe(true)
+  it('shows edge roles as labels', () => {
+    const withRole = design.edges.find((e) => e.role)!
+    expect(toFlowEdge(withRole).label).toBe(withRole.role)
   })
 
   it('new nodes get unique ids and every kind has defaults', () => {
@@ -23,7 +21,7 @@ describe('design ↔ React Flow mapping', () => {
     for (const { kind } of KINDS) {
       const n = newNode(kind, { x: 0, y: 0 }, taken)
       expect(taken.has(n.id)).toBe(false)
-      expect(n.data.kind).toBe(kind)
+      expect(n.kind).toBe(kind)
       taken.add(n.id)
     }
   })

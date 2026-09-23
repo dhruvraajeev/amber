@@ -13,21 +13,9 @@ export type NodeData = Body<DesignNode>
 export type FlowNode = Node<NodeData, NodeKind>
 export type FlowEdge = Edge<{ role?: DesignEdge['role'] }>
 
-export function toFlow(design: Design): { nodes: FlowNode[]; edges: FlowEdge[] } {
-  return {
-    nodes: design.nodes.map(({ id, position, ...data }) => ({ id, position, type: data.kind, data: data as NodeData })),
-    edges: design.edges.map(({ id, source, target, role }) => ({ id, source, target, data: { role }, label: role })),
-  }
-}
-
-// `base` supplies the non-graph fields (name, version, id).
-export function toDesign(base: Design, nodes: FlowNode[], edges: FlowEdge[]): Design {
-  return {
-    ...base,
-    nodes: nodes.map((n) => ({ id: n.id, position: { x: n.position.x, y: n.position.y }, ...n.data }) as DesignNode),
-    edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target, ...(e.data?.role && { role: e.data.role }) })),
-  }
-}
+// One way only: the store holds the Design, and the canvas renders it through this.
+export const toFlowNode = ({ id, position, ...data }: DesignNode): FlowNode => ({ id, position, type: data.kind, data: data as NodeData })
+export const toFlowEdge = ({ id, source, target, role }: DesignEdge): FlowEdge => ({ id, source, target, data: { role }, label: role })
 
 // Canonical JSON (§7.4): sorted keys, no positions, no undefined fields. Moving a node never changes it.
 // The backend must produce byte-identical output (see docs/decisions.md).
@@ -89,11 +77,10 @@ const DEFAULTS: { [K in NodeKind]: NodeParamsByKind[K] } = {
   llm: LLM_DEFAULTS.hosted,
 }
 
-export function newNode(kind: NodeKind, position: { x: number; y: number }, taken: Set<string>): FlowNode {
+export function newNode(kind: NodeKind, position: { x: number; y: number }, taken: Set<string>): DesignNode {
   let id: string
   do id = `n_${crypto.randomUUID().slice(0, 4)}`
   while (taken.has(id))
-  const name = KINDS.find((k) => k.kind === kind)!.name
-  const data = { kind, label: name, params: structuredClone(DEFAULTS[kind]) } as NodeData
-  return { id, position, type: kind, data }
+  const label = KINDS.find((k) => k.kind === kind)!.name
+  return { id, kind, label, position, params: structuredClone(DEFAULTS[kind]) } as DesignNode
 }

@@ -1,21 +1,21 @@
 import {
-  addEdge,
   Background,
   BackgroundVariant,
   Controls,
   ReactFlow,
   ReactFlowProvider,
-  useEdgesState,
-  useNodesState,
   useReactFlow,
-  type Connection,
+  type EdgeChange,
+  type NodeChange,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useMemo, useRef, useState, type DragEvent } from 'react'
-import type { Design, NodeKind } from '../types/contracts'
+import { useShallow } from 'zustand/react/shallow'
 import Inspector from '../inspector/Inspector'
 import { validate } from '../lib/validate'
-import { newNode, toDesign, toFlow, type FlowEdge, type FlowNode, type NodeData } from './map'
+import { useStore } from '../store'
+import type { NodeKind } from '../types/contracts'
+import { toFlowEdge, toFlowNode, type FlowEdge, type FlowNode } from './map'
 import NodeCard from './nodes/NodeCard'
 import Palette, { DRAG_MIME } from './Palette'
 
@@ -26,45 +26,74 @@ const nodeTypes = Object.fromEntries(
 const GRID = 20
 
 // Renders three layout cells: the palette column, the React Flow pane, and the inspector.
-// Holds the graph locally for now; Step 6 moves it into the Zustand design slice.
-export default function Canvas({ design }: { design: Design }) {
+// The design lives in the store; React Flow only draws it and reports edits back.
+export default function Canvas() {
   return (
     <ReactFlowProvider>
-      <Flow design={design} />
+      <Flow />
     </ReactFlowProvider>
   )
 }
 
-function Flow({ design }: { design: Design }) {
-  const [initial] = useState(() => toFlow(design))
-  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initial.nodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>(initial.edges)
+type Size = { width: number; height: number }
+
+function Flow() {
+  const { design, selectedId, addNode, updateNode, moveNode, connect, remove, select } = useStore(
+    useShallow(({ design, selectedId, addNode, updateNode, moveNode, connect, remove, select }) =>
+      ({ design: design!, selectedId, addNode, updateNode, moveNode, connect, remove, select })),
+  )
   const { screenToFlowPosition } = useReactFlow()
   const pane = useRef<HTMLDivElement>(null)
+  // React Flow measures each node after it renders and needs that size handed back on every render,
+  // or it hides the node. Sizes are view state, so they stay here rather than in the design.
+  const [sizes, setSizes] = useState<Record<string, Size>>({})
 
   // Re-checked on every edit; ≤50 nodes keeps this cheap. Flagged nodes and edges get an `invalid` class.
-  const issues = useMemo(() => validate(toDesign(design, nodes, edges)), [design, nodes, edges])
+  const issues = useMemo(() => validate(design), [design])
   const flagged = new Set(issues.flatMap((i) => [i.nodeId, i.edgeId]))
-  const mark = <T extends { id: string }>(xs: T[]) => xs.map((x) => (flagged.has(x.id) ? { ...x, className: 'invalid' } : x))
-  const selected = nodes.filter((n) => n.selected)
-  const update = (id: string, data: NodeData) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data } : n)))
+  const view = <T extends { id: string }>(x: T) => ({ ...x, selected: x.id === selectedId, className: flagged.has(x.id) ? 'invalid' : undefined })
+  const nodes: FlowNode[] = design.nodes.map((n) => view({ ...toFlowNode(n), measured: sizes[n.id] }))
+  const edges: FlowEdge[] = design.edges.map((e) => view(toFlowEdge(e)))
+
+  // Clicking B while A is selected reports "B selected" and "A deselected" in either order,
+  // so a deselect only clears the selection if it is still the current one.
+  const onSelect = (id: string, on: boolean) => {
+    if (on) select(id)
+    else if (useStore.getState().selectedId === id) select(null)
+  }
+
+  // Only the changes Amber cares about; React Flow's others (hover, replace) are ignored.
+  const onNodesChange = (changes: NodeChange<FlowNode>[]) => {
+    const removed: string[] = []
+    for (const c of changes) {
+      if (c.type === 'position' && c.position) moveNode(c.id, c.position)
+      else if (c.type === 'dimensions' && c.dimensions) setSizes((s) => ({ ...s, [c.id]: c.dimensions! }))
+      else if (c.type === 'select') onSelect(c.id, c.selected)
+      else if (c.type === 'remove') removed.push(c.id)
+    }
+    if (removed.length) remove(removed)
+  }
+  const onEdgesChange = (changes: EdgeChange<FlowEdge>[]) => {
+    const removed = changes.flatMap((c) => (c.type === 'remove' ? [c.id] : []))
+    if (removed.length) remove(removed)
+    for (const c of changes) if (c.type === 'select') onSelect(c.id, c.selected)
+  }
 
   const add = (kind: NodeKind, screen?: { x: number; y: number }) => {
     let position
     if (screen) {
       // Dropped from the palette: wherever the mouse let go.
       position = screenToFlowPosition(screen, { snapToGrid: true })
-    } else if (nodes.length > 0) {
+    } else if (design.nodes.length > 0) {
       // Clicked in the palette: to the right of the rightmost node, so clicks build a chain.
-      const last = nodes.reduce((a, b) => (b.position.x > a.position.x ? b : a))
+      const last = design.nodes.reduce((a, b) => (b.position.x > a.position.x ? b : a))
       position = { x: last.position.x + 220, y: last.position.y }
     } else {
       // First node on an empty canvas: the middle of the pane.
       const r = pane.current!.getBoundingClientRect()
       position = screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, { snapToGrid: true })
     }
-    const node = { ...newNode(kind, position, new Set(nodes.map((n) => n.id))), selected: true }
-    setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), node])
+    addNode(kind, position)
   }
 
   const onDrop = (e: DragEvent) => {
@@ -74,15 +103,7 @@ function Flow({ design }: { design: Design }) {
     add(kind, { x: e.clientX, y: e.clientY })
   }
 
-  // Edges leaving an agent carry a role (§7.1): "llm" when they point at an LLM, otherwise "tool".
-  // Whether the result is legal (e.g. exactly one llm edge) is Step 5's validator's job.
-  const onConnect = (c: Connection) => {
-    const kindOf = (id: string) => nodes.find((n) => n.id === id)?.data.kind
-    const role = kindOf(c.source) === 'agent' ? (kindOf(c.target) === 'llm' ? 'llm' : 'tool') : undefined
-    const edge: FlowEdge = { ...c, id: `e_${c.source}_${c.target}`, data: { role }, label: role }
-    setEdges((es) => addEdge(edge, es))
-  }
-
+  const node = design.nodes.find((n) => n.id === selectedId)
   return (
     <>
       <Palette onAdd={add} />
@@ -91,21 +112,18 @@ function Flow({ design }: { design: Design }) {
         className="min-h-0 bg-bg"
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
-        onKeyDown={(e) => {
-          if (e.key !== 'Escape') return
-          setNodes((ns) => ns.map((n) => ({ ...n, selected: false })))
-          setEdges((es) => es.map((ed) => ({ ...ed, selected: false })))
-        }}
+        onKeyDown={(e) => e.key === 'Escape' && select(null)}
       >
         <ReactFlow
-          nodes={mark(nodes)}
-          edges={mark(edges)}
+          nodes={nodes}
+          edges={edges}
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
+          onConnect={(c) => connect(c.source, c.target)}
           isValidConnection={(c) => c.source !== c.target}
           deleteKeyCode={['Delete', 'Backspace']}
+          multiSelectionKeyCode={null}
           snapToGrid
           snapGrid={[GRID, GRID]}
           colorMode="dark"
@@ -115,7 +133,7 @@ function Flow({ design }: { design: Design }) {
           <Controls showInteractive={false} />
         </ReactFlow>
       </main>
-      <Inspector node={selected.length === 1 ? selected[0] : undefined} issues={issues} onChange={update} />
+      <Inspector node={node} issues={issues} onChange={updateNode} />
     </>
   )
 }

@@ -1,5 +1,5 @@
-import { KINDS, type FlowNode, type NodeData } from '../canvas/map'
-import type { ValidationIssue } from '../types/contracts'
+import { KINDS, type NodeData } from '../canvas/map'
+import type { DesignNode, ValidationIssue } from '../types/contracts'
 import { TextField, type Errors } from './fields'
 import AgentForm from './forms/AgentForm'
 import CacheForm from './forms/CacheForm'
@@ -12,7 +12,7 @@ import UsersForm from './forms/UsersForm'
 // Right-hand panel (§11.2). With one node selected: its label and parameter form, with the
 // validator's messages inline. Otherwise: every issue in the design, so nothing hides.
 export default function Inspector({ node, issues, onChange }: {
-  node?: FlowNode; issues: ValidationIssue[]; onChange: (id: string, data: NodeData) => void
+  node?: DesignNode; issues: ValidationIssue[]; onChange: (id: string, patch: Partial<NodeData>) => void
 }) {
   return (
     <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto border-l border-border bg-panel p-3" aria-label="Inspector">
@@ -46,8 +46,7 @@ function IssueList({ issues }: { issues: ValidationIssue[] }) {
   )
 }
 
-function NodeInspector({ node, issues, onChange }: { node: FlowNode; issues: ValidationIssue[]; onChange: (id: string, data: NodeData) => void }) {
-  const d = node.data
+function NodeInspector({ node: d, issues, onChange }: { node: DesignNode; issues: ValidationIssue[]; onChange: (id: string, patch: Partial<NodeData>) => void }) {
   // Inline messages drop the "Label: " prefix the validator adds for the design-wide list.
   const prefix = `${d.label}: `
   const short = (m: string) => (m.startsWith(prefix) ? m.slice(prefix.length) : m)
@@ -63,8 +62,8 @@ function NodeInspector({ node, issues, onChange }: { node: FlowNode; issues: Val
         {name}
       </h2>
       {graphIssues.length > 0 && <IssueList issues={graphIssues} />}
-      <TextField label="Label" help="The name shown on the canvas and in results." value={d.label} onChange={(label) => onChange(node.id, { ...d, label })} />
-      <Form data={d} set={(data) => onChange(node.id, data)} err={err} />
+      <TextField label="Label" help="The name shown on the canvas and in results." value={d.label} onChange={(label) => onChange(d.id, { label })} />
+      <Form data={d} set={(data) => onChange(d.id, data)} err={err} />
     </>
   )
 }
