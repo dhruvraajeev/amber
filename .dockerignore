@@ -1,0 +1,12 @@
+# Allowlist: only what the image is built from reaches Docker. .env, .git and CLAUDE.md never do.
+*
+!frontend
+!backend
+!shared
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/.*_cache
+**/.env*
+backend/tests
