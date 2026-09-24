@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from amber.presets import SHARED
 from amber.sim.graph import validate
 
-SHARED = Path(__file__).resolve().parents[3] / "shared"
 FIXTURES = sorted((SHARED / "fixtures" / "graph").glob("*.json"))
 TEMPLATES = sorted((SHARED / "templates").glob("*.json"))
 CONFIG = {"durationS": 60, "seed": 42, "warmupS": 5}

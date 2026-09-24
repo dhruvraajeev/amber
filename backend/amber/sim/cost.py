@@ -14,7 +14,7 @@ from amber.contracts import (
     LlmNode,
     ServiceNode,
 )
-from amber.sim.graph import presets
+from amber.presets import presets
 from amber.sim.nodes import Node
 
 MONTH_S = 30 * 24 * 3600  # 2,592,000

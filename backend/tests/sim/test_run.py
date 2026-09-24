@@ -1,17 +1,17 @@
 """`simulate()` end to end (plan §7.4): the pieces wired together, and the design hash the UI shares."""
 
 import json
-from pathlib import Path
 
 import pytest
 
 from amber.contracts import Design, RunConfig
+from amber.presets import SHARED
 from amber.sim.analysis import attribution
 from amber.sim.nodes.database import Database
 from amber.sim.nodes.llm_hosted import HostedLlm
 from amber.sim.run import canonical_design, design_hash, execute, simulate
 
-TEMPLATES = Path(__file__).resolve().parents[3] / "shared" / "templates"
+TEMPLATES = SHARED / "templates"
 
 
 def template(name: str) -> dict:

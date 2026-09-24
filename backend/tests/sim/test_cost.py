@@ -1,15 +1,15 @@
 """The monthly cost model (plan §8.10), checked against the shared templates' prices."""
 
 import json
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from amber.contracts import Design
+from amber.presets import SHARED
 from amber.sim.cost import REPEATS_ALL_MONTH, monthly_cost
 
-TEMPLATES = Path(__file__).resolve().parents[3] / "shared" / "templates"
+TEMPLATES = SHARED / "templates"
 
 
 def template(stem):

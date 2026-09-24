@@ -1,7 +1,7 @@
 """The hosted LLM node: a provider's API behind a rate limit, billed per LLM token (plan §8.6)."""
 
 from amber.contracts import HostedLlmParams, LlmNode
-from amber.sim.graph import presets
+from amber.presets import presets
 from amber.sim.kernel import Environment, ProcessGen, Timeout
 from amber.sim.nodes import Node
 from amber.sim.request import Request

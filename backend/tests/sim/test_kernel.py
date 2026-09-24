@@ -1,8 +1,10 @@
 """The discrete-event kernel (plan §8.1): event order, process timing, the Resource queue and integral."""
 
+from time import perf_counter
+
 import pytest
 
-from amber.sim.kernel import Environment, Event, Process, Resource, Timeout
+from amber.sim.kernel import WALL_CHECK_EVERY, Environment, Event, Process, Resource, SimTimeout, Timeout
 
 
 def fire_log(env: Environment, log: list, name: str, delay: float) -> None:
@@ -59,6 +61,30 @@ def test_an_event_can_only_succeed_once():
 def test_negative_timeout_is_refused():
     with pytest.raises(ValueError):
         Timeout(Environment(), -1)
+
+
+def forever(env: Environment):
+    """A process that never ends: one event every millisecond."""
+    while True:
+        yield Timeout(env, 1)
+
+
+def test_a_run_past_its_wall_deadline_stops_at_the_next_check():
+    env = Environment()
+    Process(env, forever(env))
+    with pytest.raises(SimTimeout):
+        env.run(until=float("inf"), wall_deadline=perf_counter())  # already past: the first check stops it
+    assert env.events == WALL_CHECK_EVERY  # checked every 10k events, not on each one
+
+
+def test_a_wall_deadline_that_is_not_reached_changes_nothing():
+    timed, untimed = Environment(), Environment()
+    for env in (timed, untimed):
+        Process(env, forever(env))
+    timed.run(until=50_000, wall_deadline=perf_counter() + 60)
+    untimed.run(until=50_000)
+    assert timed.events == untimed.events > WALL_CHECK_EVERY
+    assert timed.now == untimed.now == 50_000
 
 
 # ── Process ──────────────────────────────────────────────────────────────────

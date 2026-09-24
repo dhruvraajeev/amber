@@ -6,14 +6,12 @@ field ranges come from the Pydantic contracts, but a design that fails them is s
 cycles, bad edges and limits, exactly as the frontend does.
 """
 
-import json
 import math
-from functools import cache
-from pathlib import Path
 
 from pydantic import TypeAdapter, ValidationError
 
 from amber.contracts import Design, RunConfig, TrafficProfile, ValidationIssue
+from amber.presets import presets
 from amber.sim.arrivals import expected_requests, peak
 
 MAX_NODES = 50
@@ -22,7 +20,6 @@ MIN_DURATION_S, MAX_DURATION_S = 10, 600  # also enforced by RunConfig's field r
 MAX_RPS = 5000
 MAX_REQUESTS = 200_000
 
-PRESETS = Path(__file__).resolve().parents[3] / "shared" / "presets"
 # (llm mode, params field) → the preset file its id must appear in.
 PRESET_FIELDS = {
     ("hosted", "presetId"): "hosted_llms",
@@ -276,12 +273,6 @@ def _unknown_presets(node: dict) -> list[tuple[str, str]]:
         and isinstance(params.get(field), str)
         and params[field] not in presets(file)
     ]
-
-
-@cache
-def presets(preset_file: str) -> dict[str, dict]:
-    """One shared/presets file as {id: preset}, read once. Nodes read their defaults from here."""
-    return {p["id"]: p for p in json.loads((PRESETS / f"{preset_file}.json").read_text())}
 
 
 def _parsed_traffic(users_node: dict) -> TrafficProfile | None:

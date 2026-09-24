@@ -49,9 +49,18 @@ class Run(NamedTuple):
     wall_ms: float
 
 
-def simulate(design: Design, config: RunConfig, *, work_samplers: WorkSamplers | None = None) -> RunResult:
-    """Run `design` for `config.durationS` simulated seconds and report what happened."""
-    run = execute(design, config, work_samplers)
+def simulate(
+    design: Design,
+    config: RunConfig,
+    *,
+    wall_limit_s: float | None = None,
+    work_samplers: WorkSamplers | None = None,
+) -> RunResult:
+    """Run `design` for `config.durationS` simulated seconds and report what happened.
+
+    With `wall_limit_s`, a run that takes longer than that in real time raises `kernel.SimTimeout`.
+    """
+    run = execute(design, config, work_samplers, wall_limit_s)
     cost = monthly_cost(design, run.nodes, config.duration_s)
     summary = run.metrics.summary()
     timeline = run.metrics.timeline()
@@ -72,7 +81,12 @@ def simulate(design: Design, config: RunConfig, *, work_samplers: WorkSamplers |
     )
 
 
-def execute(design: Design, config: RunConfig, work_samplers: WorkSamplers | None = None) -> Run:
+def execute(
+    design: Design,
+    config: RunConfig,
+    work_samplers: WorkSamplers | None = None,
+    wall_limit_s: float | None = None,
+) -> Run:
     """The simulation itself, without the reporting: what `simulate` wraps.
 
     Tests that need per-request detail (every span, every request) use this; everything else wants
@@ -92,7 +106,8 @@ def execute(design: Design, config: RunConfig, work_samplers: WorkSamplers | Non
             node.start(config.duration_s)
 
     started_at = time.perf_counter()
-    env.run(config.duration_s * 1000)
+    deadline = None if wall_limit_s is None else started_at + wall_limit_s
+    env.run(config.duration_s * 1000, deadline)
     return Run(env, nodes, metrics, (time.perf_counter() - started_at) * 1000)
 
 

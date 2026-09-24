@@ -4,11 +4,14 @@ version = "0.1.0"
 description = "Amber's simulator and API: a discrete-event model of web and AI systems."
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.141.1",
     "pydantic>=2.13.5",
+    "uvicorn>=0.53.0",
 ]
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.13.1",
     "pytest>=9.1.1",
     "ruff>=0.16.8",
 ]

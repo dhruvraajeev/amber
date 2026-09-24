@@ -8,8 +8,8 @@ import pytest
 from pydantic import ValidationError
 
 from amber.contracts import Design, RunConfig, RunResult
+from amber.presets import SHARED
 
-SHARED = Path(__file__).resolve().parents[2] / "shared"
 TEMPLATES = sorted((SHARED / "templates").glob("*.json"))
 FIXTURES = sorted((SHARED / "fixtures" / "graph").glob("*.json"))
 

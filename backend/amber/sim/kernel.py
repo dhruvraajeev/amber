@@ -18,12 +18,20 @@ The pieces:
 
 import heapq
 import itertools
+import math
 from collections import deque
 from collections.abc import Callable, Generator
+from time import perf_counter
 from typing import Any
 
 # What a process body looks like: a generator that yields events and may return a value.
 ProcessGen = Generator["Event", Any, Any]
+
+WALL_CHECK_EVERY = 10_000  # events between wall-clock checks (plan §9): cheap, yet ~every few ms
+
+
+class SimTimeout(Exception):
+    """A run went past its wall-clock deadline. The API answers 504 (§3: 20 s per run)."""
 
 
 class Environment:
@@ -39,7 +47,7 @@ class Environment:
         """Put `event` on the heap to fire at `now + delay`."""
         heapq.heappush(self._heap, (self.now + delay, next(self._seq), event))
 
-    def run(self, until: float) -> None:
+    def run(self, until: float, wall_deadline: float | None = None) -> None:
         """Fire every scheduled event whose time is at most `until`, earliest first.
 
         Events later than `until` stay on the heap, so a second `run()` carries on from here. Firing
@@ -47,11 +55,20 @@ class Environment:
         callback may schedule new events, even at the current time, and this same loop handles them.
         The clock ends at `until` even if the last event came earlier, so anything read afterwards
         (like `Resource.busy_slot_ms`) counts time right up to the end of the window.
+
+        `wall_deadline` is a `time.perf_counter()` value. Every 10k events the real clock is checked
+        against it, and past it the run raises `SimTimeout`. The check has to live in here: the API
+        runs this loop in a worker thread, and nothing outside can stop a thread that is busy computing.
         """
+        check_at = self.events + WALL_CHECK_EVERY if wall_deadline is not None else math.inf
         while self._heap and self._heap[0][0] <= until:
             time, _, event = heapq.heappop(self._heap)
             self.now = time  # time jumps; nothing sleeps
             self.events += 1
+            if self.events >= check_at:
+                if perf_counter() > wall_deadline:  # type: ignore[operator]  # inf unless it is set
+                    raise SimTimeout(f"stopped after {self.events} events at {self.now / 1000:.1f} s")
+                check_at += WALL_CHECK_EVERY
             callbacks, event.callbacks = event.callbacks, None
             for callback in callbacks:
                 callback(event)
