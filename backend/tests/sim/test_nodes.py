@@ -236,6 +236,19 @@ def test_service_spreads_requests_over_replicas_round_robin():
     assert all(replica.busy == 0 for replica in svc.replicas)
 
 
+def test_each_replica_has_its_own_line_rather_than_one_shared_queue():
+    """Two replicas, one slot and one waiting place each: four at once all fit, none is turned away.
+
+    One pooled queue of the same total size (2 slots, 1 waiting place) would reject the fourth. The
+    difference is the whole distinction between c independent M/M/1 queues and one M/M/c queue, which
+    tests/sim/test_queueing_theory.py depends on.
+    """
+    env = Environment()
+    svc = service(env, replicas=2, concurrency=1, queue=1)
+    assert statuses(send(env, svc, 4)) == ["ok", "ok", "ok", "ok"]
+    assert len(svc.replicas) == 2 and all(r.capacity == 1 for r in svc.replicas)
+
+
 def test_an_error_downstream_stops_the_remaining_calls_and_frees_every_slot():
     env = Environment()
     svc = service(env, concurrency=2)

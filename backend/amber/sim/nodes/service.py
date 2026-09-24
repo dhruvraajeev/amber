@@ -25,6 +25,11 @@ class Service(Node):
         self._rng = stream(seed, node.id, "work")
         self._next = 0  # round-robin cursor over replicas
 
+    def sample_work(self) -> float:
+        """How long this node's own work takes, in ms. `sim/run.py` swaps this out in the queueing-theory
+        tests, which need exponential work times for the textbook formulas to apply."""
+        return self._rng.lognormvariate(*self._work)
+
     def handle(self, req: Request) -> ProcessGen:
         replica = self.replicas[self._next]
         self._next = (self._next + 1) % len(self.replicas)
@@ -38,7 +43,7 @@ class Service(Node):
         yield grant  # outside the try: a slot is released only once it has been granted
         try:
             queue_ms = self.env.now - queued_at
-            work_ms = self._rng.lognormvariate(*self._work)
+            work_ms = self.sample_work()
             yield Timeout(self.env, work_ms)
             self.record(req, queue_ms, work_ms)
             for target in self.downstream:

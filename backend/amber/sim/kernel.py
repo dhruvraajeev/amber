@@ -31,6 +31,7 @@ class Environment:
 
     def __init__(self) -> None:
         self.now = 0.0  # milliseconds
+        self.events = 0  # events processed so far; reported as `engine.events` (§7.4)
         self._heap: list[tuple[float, int, Event]] = []
         self._seq = itertools.count()  # tie-breaker: equal times fire in schedule order
 
@@ -50,6 +51,7 @@ class Environment:
         while self._heap and self._heap[0][0] <= until:
             time, _, event = heapq.heappop(self._heap)
             self.now = time  # time jumps; nothing sleeps
+            self.events += 1
             callbacks, event.callbacks = event.callbacks, None
             for callback in callbacks:
                 callback(event)

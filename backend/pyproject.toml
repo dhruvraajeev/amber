@@ -30,3 +30,4 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = ["slow: timing-sensitive; left out of CI with -m \"not slow\""]
