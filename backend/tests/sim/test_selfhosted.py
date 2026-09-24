@@ -1,10 +1,12 @@
-"""The self-hosted LLM node (plan §8.7): timing and KV math by hand, replica choice, the scheduler loop.
+"""The self-hosted LLM node (plan §8.7): timing and KV math by hand, replica choice, the scheduler loop,
+and the admission check.
 
-The admission check is the owner's (Step 21c) and raises until written, so the loop tests swap in
-test-local admissions that only decide *how many* join. None of them is the real check.
+The loop tests swap in test-local admissions (admit everyone, one at a time, …) so each tests the loop
+alone; the admission tests at the end use the real `admit`, directly and through the scheduler.
 """
 
 from collections import deque
+from types import SimpleNamespace
 
 import pytest
 from test_nodes import NODE, trail
@@ -16,6 +18,7 @@ from amber.sim.nodes.llm_selfhosted import (
     PROFILES,
     SelfHostedLlm,
     TimingProfile,
+    admit,
     kv_bytes_per_token,
     kv_capacity_bytes,
 )
@@ -24,7 +27,7 @@ from amber.sim.request import Request
 GB = 1e9
 
 
-def llm(env, replicas=1, reserve=512):
+def llm(env, replicas=1, reserve=512, max_batch_size=32, max_batch_tokens=4096):
     """Llama 3.1 8B FP16 on an L4, as in the agent-self-hosted template."""
     params = {
         "mode": "selfHosted",
@@ -32,8 +35,8 @@ def llm(env, replicas=1, reserve=512):
         "model_preset_id": "llama-3.1-8b-instruct-fp16",
         "profile_id": "default",
         "replicas": replicas,
-        "max_batch_size": 32,
-        "max_batch_tokens": 4096,
+        "max_batch_size": max_batch_size,
+        "max_batch_tokens": max_batch_tokens,
         "max_output_tokens_reserve": reserve,
         "speculative": {"enabled": False, "draft_tokens": 4, "acceptance_rate": 0.7, "draft_step_ms": 3},
     }
@@ -195,11 +198,6 @@ def send(env, node, rid, at, prompt, output):
     return req
 
 
-def test_the_admission_check_is_left_for_the_owner():
-    with pytest.raises(NotImplementedError, match="owner"):
-        llm_selfhosted.admit(deque(), 0, 1e9, 32, 4096)
-
-
 def test_one_call_is_a_prefill_step_then_one_decode_step_per_token(monkeypatch):
     env, node, admission = served(monkeypatch)
     a = send(env, node, "a", 0, prompt=100, output=3)
@@ -279,3 +277,83 @@ def test_calls_admitted_together_share_one_prefill_and_replicas_run_in_parallel(
     env.run(10_000)
     # One replica: a single prefill pass over both prompts (10 + 200). Two: one each, at once (10 + 100).
     assert admission.first_token == {"a": first_token_at, "b": first_token_at}
+
+
+# ── Admission (§8.7) ──────────────────────────────────────────────────────────
+
+
+def line(*sizes):
+    """A waiting line of (prompt_tokens, kv_bytes) pairs; admission reads nothing else."""
+    return deque(SimpleNamespace(prompt_tokens=p, kv_bytes=kv) for p, kv in sizes)
+
+
+def test_an_empty_line_admits_nobody():
+    assert admit(line(), 0, 1e9, 32, 4096) == 0
+
+
+def test_the_batch_size_counts_the_running_sequences():
+    five = line(*[(10, 1)] * 5)
+    assert admit(five, 0, 1e9, 32, 4096) == 5
+    assert admit(five, 30, 1e9, 32, 4096) == 2  # 30 running + 2 = 32
+    assert admit(five, 32, 1e9, 32, 4096) == 0  # full
+
+
+def test_admitted_kv_must_fit_in_what_is_free():
+    three = line(*[(10, 10)] * 3)
+    assert admit(three, 0, 25, 32, 4096) == 2
+    assert admit(three, 0, 30, 32, 4096) == 3  # exactly full is allowed
+    assert admit(three, 0, 9, 32, 4096) == 0
+
+
+def test_admitted_prompts_must_fit_the_prefill_budget():
+    three = line(*[(1000, 1)] * 3)
+    assert admit(three, 0, 1e9, 32, 2500) == 2
+    assert admit(three, 0, 1e9, 32, 3000) == 3  # exactly the budget is allowed
+
+
+def test_an_oversized_prompt_is_prefilled_alone_but_only_when_first():
+    assert admit(line((5000, 1), (10, 1)), 0, 1e9, 32, 4096) == 1  # alone: nothing joins it
+    assert admit(line((5000, 1)), 7, 1e9, 32, 4096) == 1  # "first this step", whatever is running
+    assert admit(line((10, 1), (5000, 1)), 0, 1e9, 32, 4096) == 1  # behind another: next step
+
+
+def test_the_oversized_exception_is_only_for_the_prefill_budget():
+    assert admit(line((5000, 100)), 0, 50, 32, 4096) == 0  # still has to fit in KV
+    assert admit(line((5000, 1)), 32, 1e9, 32, 4096) == 0  # and in the batch
+
+
+def test_admission_never_skips_ahead_or_changes_the_line():
+    waiting = line((10, 100), (10, 1), (10, 1))  # the first doesn't fit; the two behind it would
+    assert admit(waiting, 0, 50, 32, 4096) == 0
+    assert len(waiting) == 3
+
+
+def test_through_the_scheduler_the_limits_hold_at_every_step_and_nobody_is_dropped(monkeypatch):
+    env = Environment()
+    node = llm(env, max_batch_size=4, max_batch_tokens=2500)
+    node.profile = ROUND
+    unit = (1000 + 512) * 131_072  # the KV of one 1000-token prompt
+    node.kv_capacity_bytes = 6 * unit  # tight, so KV binds as often as the batch size does
+    steps = []
+
+    def watched(waiting, running, kv_free_bytes, max_batch_size, max_batch_tokens):
+        n = admit(waiting, running, kv_free_bytes, max_batch_size, max_batch_tokens)
+        joining = list(waiting)[:n]
+        kv_after = node.kv_capacity_bytes - kv_free_bytes + sum(s.kv_bytes for s in joining)
+        steps.append((running + n, n, sum(s.prompt_tokens for s in joining), kv_after, len(waiting) - n))
+        return n
+
+    monkeypatch.setattr(llm_selfhosted, "admit", watched)
+    prompts = [1000, 3000, 200, 1500, 800, 2600, 100, 1200]  # 3000 and 2600 exceed the prefill budget
+    reqs = [send(env, node, f"r{i}", i * 7, prompts[i % 8], 5 + i % 11) for i in range(40)]
+    env.run(1_000_000)
+
+    assert all(batch <= 4 for batch, *_ in steps)
+    assert all(tokens <= 2500 or n == 1 for _, n, tokens, *_ in steps)  # over budget only when alone
+    assert all(kv <= node.kv_capacity_bytes for *_, kv, _ in steps)
+    assert not any(r.failed for r in reqs) and node.served == 40  # everyone waited, nobody dropped
+    assert (node.replicas[0].kv_used, node.replicas[0].load) == (0, 0)
+    # The limits were really reached, so the checks above test something.
+    assert max(batch for batch, *_ in steps) == 4
+    assert any(tokens > 2500 for _, _, tokens, *_ in steps)
+    assert max(waiting for *_, waiting in steps) > 0

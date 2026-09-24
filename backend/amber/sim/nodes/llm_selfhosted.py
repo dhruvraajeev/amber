@@ -1,7 +1,7 @@
 """The self-hosted LLM node: your own GPUs running continuous batching (plan §8.7).
 
 Step 21 builds it in four parts: 21a the timing model, the KV-cache math and the choice of replica;
-21b one continuous-batching scheduler per replica; 21c the admission check (the owner's, by hand);
+21b one continuous-batching scheduler per replica; 21c the admission check;
 21d wiring it into runs.
 """
 
@@ -84,11 +84,10 @@ class Sequence:
 def admit(
     waiting: deque[Sequence], running: int, kv_free_bytes: float, max_batch_size: int, max_batch_tokens: int
 ) -> int:
-    """TODO(owner, Step 21c): how many sequences, from the front of `waiting`, join the batch this step.
+    """How many sequences, from the front of `waiting`, join the batch this step (§8.7).
 
     Inputs:
-        waiting           the replica's line, oldest first. Read it, don't change it: the scheduler
-                          pops the ones you admit.
+        waiting           the replica's line, oldest first. Only read: the scheduler pops the admitted.
         running           how many sequences are already in the batch
         kv_free_bytes     KV-cache bytes not reserved by `running` (capacity − what they hold)
         max_batch_size    the most sequences the batch may hold: running + admitted
@@ -96,7 +95,7 @@ def admit(
 
     Returns n ≥ 0: the scheduler admits `waiting[0]` … `waiting[n - 1]`.
 
-    Go strictly in order and stop at the first sequence that would break any of the three limits:
+    Strictly in order, stopping at the first sequence that would break any of three limits:
         1. batch size      running + admitted ≤ max_batch_size
         2. KV fit          the admitted sequences' `kv_bytes` add up to ≤ kv_free_bytes
         3. prefill budget  their `prompt_tokens` add up to ≤ max_batch_tokens, except that the first
@@ -104,7 +103,18 @@ def admit(
                            alone rather than never; §8.7's `if admitted and …`)
     A sequence that doesn't fit is never skipped or dropped: it stays first in line for a later step.
     """
-    raise NotImplementedError("Step 21c: the admission check is the owner's to write by hand")
+    n = kv = tokens = 0
+    for seq in waiting:
+        if running + n >= max_batch_size:
+            break
+        if kv + seq.kv_bytes > kv_free_bytes:
+            break
+        if n and tokens + seq.prompt_tokens > max_batch_tokens:
+            break
+        n += 1
+        kv += seq.kv_bytes
+        tokens += seq.prompt_tokens
+    return n
 
 
 @dataclass(slots=True)
