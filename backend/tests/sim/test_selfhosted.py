@@ -1,10 +1,17 @@
-"""The self-hosted LLM node (plan §8.7). 21a: timing and KV-cache math checked by hand, replica choice."""
+"""The self-hosted LLM node (plan §8.7): timing and KV math by hand, replica choice, the scheduler loop.
+
+The admission check is the owner's (Step 21c) and raises until written, so the loop tests swap in
+test-local admissions that only decide *how many* join. None of them is the real check.
+"""
+
+from collections import deque
 
 import pytest
-from test_nodes import NODE
+from test_nodes import NODE, trail
 
 from amber.presets import presets
-from amber.sim.kernel import Environment, Process
+from amber.sim.kernel import Environment, Process, Timeout
+from amber.sim.nodes import llm_selfhosted
 from amber.sim.nodes.llm_selfhosted import (
     PROFILES,
     SelfHostedLlm,
@@ -36,11 +43,11 @@ def llm(env, replicas=1, reserve=512):
     return SelfHostedLlm(env, node, seed=42)
 
 
-def calls(env, node, n, prompt=100, output=10):
-    """Start `n` calls and run until each has joined a replica's line (nothing serves them yet)."""
+def calls(node, n, prompt=100, output=10):
+    """Queue `n` calls without running the clock: each call runs up to its wait, so it joins a
+    replica's line, and no scheduler step (so no admission) happens."""
     for i in range(n):
-        Process(env, node.call(Request(f"r{i}", 0.0, float("inf")), prompt, output))
-    env.run(1.0)
+        next(node.call(Request(f"r{i}", 0.0, float("inf")), prompt, output))
 
 
 # ── Timing (§8.7, Appendix B) ─────────────────────────────────────────────────
@@ -109,7 +116,7 @@ def test_the_node_reads_its_presets():
 def test_a_call_reserves_kv_for_its_prompt_plus_the_output_reserve_and_waits():
     env = Environment()
     node = llm(env, reserve=512)
-    calls(env, node, 1, prompt=800, output=150)
+    calls(node, 1, prompt=800, output=150)
     [seq] = node.replicas[0].waiting
     assert (seq.prompt_tokens, seq.output_tokens) == (800, 150)
     assert seq.kv_bytes == (800 + 512) * 131_072  # the reserve, not the actual 150 output tokens
@@ -119,8 +126,7 @@ def test_a_call_reserves_kv_for_its_prompt_plus_the_output_reserve_and_waits():
 def test_handle_uses_the_model_presets_default_sizes():
     env = Environment()
     node = llm(env)
-    Process(env, node.handle(Request("r", 0.0, float("inf"))))
-    env.run(1.0)
+    next(node.handle(Request("r", 0.0, float("inf"))))
     [seq] = node.replicas[0].waiting
     assert (seq.prompt_tokens, seq.output_tokens) == (512, 256)  # models.json defaults
 
@@ -128,7 +134,7 @@ def test_handle_uses_the_model_presets_default_sizes():
 def test_calls_spread_over_empty_replicas_in_index_order():
     env = Environment()
     node = llm(env, replicas=3)
-    calls(env, node, 7)  # every tie goes to the lowest index: 0,1,2, 0,1,2, 0
+    calls(node, 7)  # every tie goes to the lowest index: 0,1,2, 0,1,2, 0
     assert [len(r.waiting) for r in node.replicas] == [3, 2, 2]
     assert [s.req.id for s in node.replicas[0].waiting] == ["r0", "r3", "r6"]
 
@@ -137,11 +143,139 @@ def test_replica_choice_counts_waiting_and_running_together():
     env = Environment()
     node = llm(env, replicas=3)
     r0, r1, r2 = node.replicas
-    calls(env, node, 1)  # all empty → r0 (waiting 1)
+    calls(node, 1)  # all empty → r0 (waiting 1)
     r1.running.append(r0.waiting.popleft())  # as if admitted: r0 = 0, r1 = 1 running, r2 = 0
-    calls(env, node, 1)  # tie between r0 and r2 → r0
+    calls(node, 1)  # tie between r0 and r2 → r0
     assert (r0.load, r1.load, r2.load) == (1, 1, 0)
-    calls(env, node, 1)  # r2 is the only empty one, whatever the index
+    calls(node, 1)  # r2 is the only empty one, whatever the index
     assert (r0.load, r1.load, r2.load) == (1, 1, 1)
     r0.running.extend([r0.waiting.popleft(), r1.running.pop()])  # r0 = 2 running, r1 = 0, r2 = 1 waiting
     assert node.pick_replica() is r1
+
+
+# ── Scheduler loop (§8.7) ─────────────────────────────────────────────────────
+
+# Round numbers: prefill 10 ms + 1 ms per prompt token, decode step 5 ms + 1 ms per sequence.
+ROUND = TimingProfile(prefill_base_ms=10, prefill_ms_per_token=1, decode_base_ms=5, decode_ms_per_sequence=1)
+
+
+class AdmitAll:
+    """Test-local admission: everyone waiting joins. Notes when each gets its first token."""
+
+    def __init__(self, env):
+        self.env = env
+        self.first_token = {}
+
+    def __call__(self, waiting, running, kv_free_bytes, max_batch_size, max_batch_tokens):
+        for seq in waiting:
+            seq.first_token.callbacks.append(
+                lambda _, rid=seq.req.id: self.first_token.setdefault(rid, self.env.now)
+            )
+        return len(waiting)
+
+
+def served(monkeypatch, admission=None, replicas=1):
+    """A node on the ROUND profile whose scheduler uses `admission` (default: AdmitAll)."""
+    env = Environment()
+    admission = admission or AdmitAll(env)
+    monkeypatch.setattr(llm_selfhosted, "admit", admission)
+    node = llm(env, replicas=replicas)
+    node.profile = ROUND
+    return env, node, admission
+
+
+def send(env, node, rid, at, prompt, output):
+    req = Request(rid, at, float("inf"))
+
+    def arrive():
+        yield Timeout(env, at)
+        yield from node.call(req, prompt, output)
+
+    Process(env, arrive())
+    return req
+
+
+def test_the_admission_check_is_left_for_the_owner():
+    with pytest.raises(NotImplementedError, match="owner"):
+        llm_selfhosted.admit(deque(), 0, 1e9, 32, 4096)
+
+
+def test_one_call_is_a_prefill_step_then_one_decode_step_per_token(monkeypatch):
+    env, node, admission = served(monkeypatch)
+    a = send(env, node, "a", 0, prompt=100, output=3)
+    env.run(10_000)
+    # t=110 prefill (10 + 100) gives token 1; 116 and 122 are decode steps of a batch of one (5 + 1).
+    assert admission.first_token == {"a": 110}
+    assert trail(a) == [("llm", 0.0, 122.0)]
+    assert (node.served, node.replicas[0].kv_used, node.replicas[0].running) == (1, 0, [])
+
+
+def test_an_idle_scheduler_wakes_for_a_later_call(monkeypatch):
+    env, node, admission = served(monkeypatch)
+    send(env, node, "a", 0, prompt=100, output=1)
+    b = send(env, node, "b", 1000, prompt=100, output=1)
+    env.run(10_000)
+    assert admission.first_token == {"a": 110, "b": 1110}  # output 1: done with its first token
+    assert trail(b) == [("llm", 0.0, 110.0)]
+
+
+def test_a_new_call_joins_the_running_batch_at_the_next_step(monkeypatch):
+    env, node, admission = served(monkeypatch)
+    a = send(env, node, "a", 0, prompt=100, output=3)
+    b = send(env, node, "b", 50, prompt=20, output=2)
+    env.run(10_000)
+    # 0→110: a's prefill. b arrives at 50 and waits for the step to end.
+    # 110→146: b's prefill (10 + 20) and a's decode (5 + 1) in one pass → b's token 1, a's token 2.
+    # 146→153: decode of both (5 + 2) → a has 3, b has 2: both done.
+    assert admission.first_token == {"a": 110, "b": 146}
+    assert trail(a) == [("llm", 0.0, 153.0)]
+    assert trail(b) == [("llm", 60.0, 43.0)]  # queued 50→110, then 110→153
+    assert (node.replicas[0].kv_used, node.replicas[0].running) == (0, [])
+
+
+def test_whoever_admission_holds_back_waits_so_ttft_grows_with_the_line(monkeypatch):
+    def one_at_a_time(waiting, running, kv_free_bytes, max_batch_size, max_batch_tokens):
+        return min(len(waiting), 1 - running)
+
+    env, node, _ = served(monkeypatch, one_at_a_time)
+    a = send(env, node, "a", 0, prompt=100, output=2)
+    b = send(env, node, "b", 0, prompt=100, output=2)
+    env.run(10_000)
+    assert trail(a) == [("llm", 0.0, 116.0)]  # 110 prefill + one decode step
+    assert trail(b) == [("llm", 116.0, 116.0)]  # admitted only once a is done
+
+
+def test_admission_is_asked_with_the_line_the_batch_and_the_free_kv(monkeypatch):
+    asked = []
+
+    def spy(waiting, running, kv_free_bytes, max_batch_size, max_batch_tokens):
+        asked.append((len(waiting), running, kv_free_bytes, max_batch_size, max_batch_tokens))
+        return len(waiting)
+
+    env, node, _ = served(monkeypatch, spy)
+    send(env, node, "a", 0, prompt=100, output=2)
+    env.run(10_000)
+    capacity = node.kv_capacity_bytes
+    reserved = (100 + 512) * 131_072
+    assert asked == [(1, 0, capacity, 32, 4096), (0, 1, capacity - reserved, 32, 4096)]
+
+
+def test_a_call_that_cannot_fit_an_empty_replica_is_rejected_not_left_waiting_forever(monkeypatch):
+    env, node, _ = served(monkeypatch, lambda *_: 0)
+    reqs = [send(env, node, rid, 0, prompt=100, output=2) for rid in "ab"]
+    env.run(10_000)
+    assert [r.status for r in reqs] == ["rejected", "rejected"]
+    assert [r.spans for r in reqs] == [[], []]  # turned away here, like a full service queue
+    assert (node.rejects, node.served, node.replicas[0].load) == (2, 0, 0)
+
+
+@pytest.mark.parametrize(("replicas", "first_token_at"), [(1, 210), (2, 110)])
+def test_calls_admitted_together_share_one_prefill_and_replicas_run_in_parallel(
+    monkeypatch, replicas, first_token_at
+):
+    env, node, admission = served(monkeypatch, replicas=replicas)
+    for rid in "ab":
+        send(env, node, rid, 0, prompt=100, output=1)
+    env.run(10_000)
+    # One replica: a single prefill pass over both prompts (10 + 200). Two: one each, at once (10 + 100).
+    assert admission.first_token == {"a": first_token_at, "b": first_token_at}
