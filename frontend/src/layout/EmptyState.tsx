@@ -1,14 +1,17 @@
-import { ArrowUpRight, Plus } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Plus } from 'lucide-react'
 import { BLANK, KINDS } from '../canvas/map'
 import type { Design } from '../api/api'
 
 // Empty state (§11.3): three template cards and "Blank canvas", under an ember orb.
 // Each card draws its template's real graph, so you can see the shape before you pick it.
-export default function EmptyState({ templates, offline, onPick }: { templates: Design[]; offline: boolean; onPick: (d: Design) => void }) {
+// `resume` names the design left open in the editor, if any, so it can be picked up again.
+export default function EmptyState({ templates, offline, resume, onPick, onResume }: {
+  templates: Design[]; offline: boolean; resume?: string; onPick: (d: Design) => void; onResume: () => void
+}) {
   return (
     <div className="panel grid h-full place-items-center overflow-auto px-6 py-10">
       <div className="flex w-full max-w-4xl flex-col items-center">
-        <div className="orb size-40 sm:size-48" aria-hidden />
+        <div className="orb size-40 [view-transition-name:orb] sm:size-48" aria-hidden />
         <h1 className="mt-10 text-center text-3xl font-semibold tracking-[-0.03em] text-balance">Start from a template</h1>
         <p className="mt-2 text-center text-muted">Pick a starting architecture, then press Run to see where it breaks.</p>
         {offline ? (
@@ -37,13 +40,21 @@ export default function EmptyState({ templates, offline, onPick }: { templates: 
             ))}
           </div>
         )}
-        <button
-          onClick={() => onPick(BLANK)}
-          className="field mt-6 flex h-10 items-center gap-2 rounded-full px-4 text-[13px] text-muted hover:text-text"
-        >
-          <Plus size={15} aria-hidden />
-          Blank canvas
-        </button>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          {resume !== undefined && (
+            <button onClick={onResume} className="field flex h-10 max-w-80 items-center gap-2 rounded-full px-4 text-[13px] text-text">
+              <span className="truncate">Continue {resume || 'your design'}</span>
+              <ArrowRight size={15} className="shrink-0 text-accent" aria-hidden />
+            </button>
+          )}
+          <button
+            onClick={() => onPick(BLANK)}
+            className="field flex h-10 items-center gap-2 rounded-full px-4 text-[13px] text-muted hover:text-text"
+          >
+            <Plus size={15} aria-hidden />
+            Blank canvas
+          </button>
+        </div>
       </div>
     </div>
   )

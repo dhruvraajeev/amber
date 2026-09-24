@@ -39,7 +39,7 @@ export const designSlice: StateCreator<Store, [], [], DesignSlice> = (set, get) 
     // A new design starts with no result: the last run belongs to the old one (pins are kept for Compare).
     loadTemplate: (design) =>
       set((s) => ({
-        design: structuredClone(design), selectedId: null, loads: s.loads + 1,
+        design: structuredClone(design), selectedId: null, loads: s.loads + 1, home: false,
         status: 'idle', result: null, issues: [], playhead: 0, playing: false,
       })),
     setName: (name) => edit(() => ({ name })),

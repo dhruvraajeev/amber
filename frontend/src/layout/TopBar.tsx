@@ -1,13 +1,28 @@
 import { GitCompareArrows, Info } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Link, NavLink } from 'react-router'
+import { Link, NavLink, useLocation } from 'react-router'
+import { transition } from '../lib/transition'
+import { useStore } from '../store'
 
 // Top bar (§11.2): the mark, page-specific controls (`children`), then Compare and the model assumptions.
 // "Model" opens the assumptions (§8.11) in a native popover: Esc and clicking outside close it.
+// The mark always leads to the landing page, fading across; from the editor it keeps the design to resume.
 export default function TopBar({ children, className = '' }: { children?: ReactNode; className?: string }) {
+  const { pathname } = useLocation()
+  const { setHome } = useStore.getState()
   return (
     <header className={`flex min-w-0 items-center gap-3 px-1 ${className}`}>
-      <Link to="/" className="flex shrink-0 items-center gap-2.5 pr-2" aria-label="Amber home">
+      <Link
+        to="/"
+        viewTransition
+        onClick={(e) => {
+          if (pathname !== '/') return setHome(true) // the router fades across to the new page
+          e.preventDefault()
+          transition(() => setHome(true))
+        }}
+        className="flex shrink-0 items-center gap-2.5 pr-2"
+        aria-label="Amber home"
+      >
         <Mark />
         <span className="text-[15px] font-semibold tracking-[-0.01em]">Amber</span>
       </Link>

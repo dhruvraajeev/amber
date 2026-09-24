@@ -431,6 +431,40 @@ input[type="range"]::-moz-range-thumb {
   stroke-dasharray: 4 3;
 }
 
+/* Landing ↔ editor (lib/transition.ts): the page fades and settles into place, and the orb rises in on
+   its own (and sinks away when a design opens). Native view transitions; no library. */
+::view-transition-old(root) {
+  animation: vt-out 200ms ease-out both;
+}
+::view-transition-new(root) {
+  animation: vt-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+::view-transition-new(orb) {
+  animation: orb-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+::view-transition-old(orb) {
+  animation: orb-rise 240ms ease-in reverse both;
+}
+@keyframes vt-out {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+}
+@keyframes orb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.85);
+    filter: blur(8px);
+  }
+}
+
 /* Reduced motion (§11.3): no traveling dots; after a run, edges are static dashes whose thickness is
    throughput. Ambient motion (orb, pulses, sweeps) stops too. */
 @media (prefers-reduced-motion: reduce) {
@@ -446,5 +480,10 @@ input[type="range"]::-moz-range-thumb {
   }
   .btn-primary::after {
     display: none;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation: none;
   }
 }
