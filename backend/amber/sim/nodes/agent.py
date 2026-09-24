@@ -7,6 +7,7 @@ from amber.contracts import AgentNode
 from amber.sim.kernel import Environment, Event, ProcessGen, Timeout
 from amber.sim.nodes import Node
 from amber.sim.nodes.llm_hosted import HostedLlm
+from amber.sim.nodes.llm_selfhosted import SelfHostedLlm
 from amber.sim.request import Request
 from amber.sim.rng import lognormal_from_percentiles, poisson, stream
 
@@ -38,7 +39,7 @@ class Agent(Node):
         self._calls_rng = stream(seed, node.id, "calls")
         self._work_rng = stream(seed, node.id, "work")
         # Wired by `sim/run.py` from the edge roles, once every node exists (§7.6 AGENT_EDGES).
-        self.llm: HostedLlm | None = None
+        self.llm: HostedLlm | SelfHostedLlm | None = None
         self.tools: list[Node] = []
 
     def connect(self, target: Node, role: str | None) -> None:

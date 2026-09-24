@@ -1,14 +1,14 @@
 """The self-hosted LLM node: your own GPUs running continuous batching (plan §8.7).
 
-Step 21 builds it in four parts: 21a the timing model, the KV-cache math and the choice of replica;
-21b one continuous-batching scheduler per replica; 21c the admission check;
-21d wiring it into runs.
+Pieces, top to bottom: the timing model and the KV-cache math, the admission check, a replica (one GPU
+server with its waiting line and running batch), and the node, which picks a replica per call and runs
+one scheduler per replica. Speculative decoding is Step 22.
 """
 
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from amber.contracts import LlmNode, SelfHostedLlmParams
+from amber.contracts import GpuPoint, LlmNode, SelfHostedLlmParams
 from amber.presets import presets
 from amber.sim.kernel import Environment, Event, Process, ProcessGen, Timeout
 from amber.sim.nodes import Node
@@ -64,18 +64,17 @@ def kv_capacity_bytes(gpu: dict, model: dict) -> float:
 
 @dataclass(slots=True, eq=False)
 class Sequence:
-    """One LLM call inside a replica: its size, the KV it reserves, and the events its caller waits on.
+    """One LLM call inside a replica: its size, the KV it reserves, and the event its caller waits on.
 
-    `kv_bytes` is reserved when the sequence is admitted and freed when it finishes. `first_token`
-    fires at the end of the step that admitted it (its prefill), `done` once `generated` reaches
-    `output_tokens`.
+    `kv_bytes` is reserved when the sequence is admitted and freed when it finishes. Its first token
+    comes at the end of the step that admitted it (its prefill); `done` fires once `generated` reaches
+    `output_tokens`, or when it is turned away.
     """
 
     req: Request
     prompt_tokens: int
     output_tokens: int
     kv_bytes: int
-    first_token: Event
     done: Event
     admitted_at: float = 0.0  # ms
     generated: int = 0
@@ -117,19 +116,51 @@ def admit(
     return n
 
 
-@dataclass(slots=True)
 class Replica:
-    """One GPU server: requests `waiting` to be admitted, the `running` batch it decodes, the KV those
-    hold, and `idle`, the event its scheduler sleeps on while there is nothing to do."""
+    """One GPU server: sequences `waiting` to be admitted, the `running` batch (every admitted sequence
+    that isn't done yet, prefilling or decoding) and the KV that batch holds.
 
-    waiting: deque[Sequence] = field(default_factory=deque)
-    running: list[Sequence] = field(default_factory=list)
-    kv_used: int = 0  # bytes reserved by `running`
-    idle: Event | None = None
+    Metrics reads it like a kernel `Resource`, with the batch as the slots: `capacity` is
+    `maxBatchSize`, `busy_slot_ms` integrates the batch size over time (so utilization is how full the
+    batch ran), and `pop_queue_peak()` is the longest the waiting line got.
+    """
+
+    def __init__(self, env: Environment, max_batch_size: int) -> None:
+        self.env = env
+        self.capacity = max_batch_size
+        self.waiting: deque[Sequence] = deque()
+        self.running: list[Sequence] = []
+        self.kv_used = 0  # bytes reserved by `running`
+        self.idle: Event | None = None  # what the scheduler sleeps on while there is nothing to do
+        self._integral = 0.0  # batch slot-ms up to _since
+        self._since = 0.0
+        self._queue_peak = 0
 
     @property
     def load(self) -> int:
         return len(self.waiting) + len(self.running)
+
+    @property
+    def busy_slot_ms(self) -> float:
+        return self._integral + len(self.running) * (self.env.now - self._since)
+
+    def enqueue(self, seq: Sequence) -> None:
+        """Join the line, and wake the scheduler if it is asleep."""
+        self.waiting.append(seq)
+        self._queue_peak = max(self._queue_peak, len(self.waiting))
+        if self.idle is not None:
+            self.idle.succeed()
+            self.idle = None
+
+    def set_running(self, running: list[Sequence]) -> None:
+        self._integral = self.busy_slot_ms
+        self._since = self.env.now
+        self.running = running
+
+    def pop_queue_peak(self) -> int:
+        """The longest the line has been since the last call; the next window starts from its length now."""
+        peak, self._queue_peak = self._queue_peak, len(self.waiting)
+        return peak
 
 
 class SelfHostedLlm(Node):
@@ -150,7 +181,8 @@ class SelfHostedLlm(Node):
         self.max_output_tokens_reserve = p.max_output_tokens_reserve
         self.max_batch_size = p.max_batch_size
         self.max_batch_tokens = p.max_batch_tokens
-        self.replicas = [Replica() for _ in range(p.replicas)]
+        self.replicas = [Replica(env, p.max_batch_size) for _ in range(p.replicas)]
+        self.resources = self.replicas  # utilization and queue length, as for a service
         for replica in self.replicas:
             Process(env, self._schedule(replica))
 
@@ -166,12 +198,8 @@ class SelfHostedLlm(Node):
         """
         queued_at = self.env.now
         kv_bytes = (prompt_tokens + self.max_output_tokens_reserve) * self.kv_bytes_per_token
-        seq = Sequence(req, prompt_tokens, output_tokens, kv_bytes, Event(self.env), Event(self.env))
-        replica = self.pick_replica()
-        replica.waiting.append(seq)
-        if replica.idle is not None:  # wake its scheduler
-            replica.idle.succeed()
-            replica.idle = None
+        seq = Sequence(req, prompt_tokens, output_tokens, kv_bytes, Event(self.env))
+        self.pick_replica().enqueue(seq)
         yield seq.done
         if not req.failed:
             self.record(req, seq.admitted_at - queued_at, self.env.now - seq.admitted_at)
@@ -181,12 +209,24 @@ class SelfHostedLlm(Node):
         the first), so the choice is deterministic."""
         return min(self.replicas, key=lambda r: r.load)
 
+    def gpu_point(self, t: float) -> GpuPoint:
+        """The node right now, across its replicas: the share of KV reserved, the batch, the line."""
+        kv_total = self.kv_capacity_bytes * len(self.replicas)
+        return GpuPoint(
+            t=t,
+            # A model that doesn't fit has no KV at all; Step 22 makes that a validation issue.
+            kv_pct=sum(r.kv_used for r in self.replicas) / kv_total if kv_total > 0 else 1.0,
+            batch=sum(len(r.running) for r in self.replicas),
+            waiting=sum(len(r.waiting) for r in self.replicas),
+        )
+
     def _schedule(self, replica: Replica) -> ProcessGen:
         """One replica's scheduler, one step per loop, forever (§8.7). Sleeps while it has no work.
 
         A step prefills the sequences admitted at its start and, in the same pass, adds one token to
-        every sequence already running. At its end the admitted ones have their first token and join
-        the batch, and any sequence with all its output is done and frees its KV.
+        every sequence already running. The admitted join the batch at once (they hold KV from now
+        on). At the end of the step they have their first token, and any sequence with all its output
+        is done and frees its KV.
         """
         while True:
             if not replica.load:
@@ -211,6 +251,7 @@ class SelfHostedLlm(Node):
             for seq in admitted:
                 seq.admitted_at = self.env.now
                 replica.kv_used += seq.kv_bytes
+            replica.set_running(decoding + admitted)
             step_ms = 0.0
             if admitted:
                 step_ms += self.profile.prefill_ms(sum(seq.prompt_tokens for seq in admitted))
@@ -219,15 +260,22 @@ class SelfHostedLlm(Node):
             yield Timeout(self.env, step_ms)
 
             for seq in admitted:
-                seq.first_token.succeed()
-            replica.running = []
-            for seq in decoding + admitted:
+                if seq.req.first_token_at is None:  # what the user sees is the first call's first token
+                    seq.req.first_token_at = self.env.now
+            still_running = []
+            for seq in replica.running:
                 seq.generated += 1
                 if seq.generated >= seq.output_tokens:
-                    replica.kv_used -= seq.kv_bytes
-                    seq.done.succeed()
+                    self._finish(replica, seq)
                 else:
-                    replica.running.append(seq)
+                    still_running.append(seq)
+            replica.set_running(still_running)
+
+    def _finish(self, replica: Replica, seq: Sequence) -> None:
+        """The one way out of the batch: free the sequence's KV and hand its caller back control.
+        Step 22 (or anything that cancels a sequence) must leave through here too."""
+        replica.kv_used -= seq.kv_bytes
+        seq.done.succeed()
 
     def _reject(self, seq: Sequence) -> None:
         seq.req.status = "rejected"

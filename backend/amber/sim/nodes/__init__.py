@@ -11,7 +11,9 @@ class Node:
     node can't be handed targets that haven't been built yet.
 
     Metrics (Step 15) sample three things from every node, once per simulated second: `resources`
-    (the slot pools behind utilization and queue length; empty for kinds with no capacity limit),
+    (the slot pools behind utilization and queue length: kernel `Resource`s, or anything with the same
+    `capacity`, `busy_slot_ms` and `pop_queue_peak()`, like a GPU replica; empty for kinds with no
+    capacity limit),
     `served` (requests whose own work finished here) and `rejects` (requests turned away here).
     """
 

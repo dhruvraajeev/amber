@@ -11,6 +11,7 @@ import sys
 import textwrap
 from pathlib import Path
 
+import pytest
 from test_run import TEMPLATES, design, template
 
 from amber.contracts import Design, RunConfig
@@ -28,8 +29,9 @@ def result_json(name="rag-chatbot-hosted", duration_s=30, seed=7) -> str:
     return json.dumps(body, sort_keys=True)
 
 
-def test_the_same_inputs_give_byte_identical_json():
-    assert result_json() == result_json()
+@pytest.mark.parametrize("name", ["rag-chatbot-hosted", "agent-self-hosted"])
+def test_the_same_inputs_give_byte_identical_json(name):
+    assert result_json(name) == result_json(name)
 
 
 def test_only_the_host_machine_fields_are_allowed_to_move():

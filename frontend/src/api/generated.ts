@@ -95,7 +95,7 @@ export interface paths {
         put?: never;
         /**
          * Simulate Design
-         * @description `{design, config}` → the RunResult (§7.4), or 422 with the issues, 429, 504 or 501.
+         * @description `{design, config}` → the RunResult (§7.4), or 422 with the issues, 429 or 504.
          */
         post: operations["simulate_design_api_simulate_post"];
         delete?: never;

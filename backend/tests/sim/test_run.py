@@ -9,6 +9,7 @@ from amber.presets import SHARED
 from amber.sim.analysis import attribution
 from amber.sim.nodes.database import Database
 from amber.sim.nodes.llm_hosted import HostedLlm
+from amber.sim.nodes.llm_selfhosted import SelfHostedLlm
 from amber.sim.run import canonical_design, design_hash, execute, simulate
 
 TEMPLATES = SHARED / "templates"
@@ -78,19 +79,39 @@ def test_edges_become_downstream_links_in_edge_order():
     assert run.nodes["n_vec"].downstream == []
 
 
-def test_node_kinds_that_no_class_exists_for_yet_say_so():
-    with pytest.raises(NotImplementedError, match="self-hosted"):
-        simulate(design("agent-self-hosted"), config())
-
-
-def test_a_self_hosted_llm_is_refused_rather_than_treated_like_a_hosted_one():
+def test_an_llm_nodes_mode_picks_its_class():
     """Same `kind`, a different params union member: the mode has to be checked, not just the kind."""
     raw = template("rag-chatbot-hosted")
     llm = next(n for n in raw["nodes"] if n["id"] == "n_llm")
     llm["params"] = next(n for n in template("agent-self-hosted")["nodes"] if n["id"] == "n_llm")["params"]
 
-    with pytest.raises(NotImplementedError, match="self-hosted"):
-        simulate(Design.model_validate(raw), config())
+    assert isinstance(execute(design("rag-chatbot-hosted"), config()).nodes["n_llm"], HostedLlm)
+    assert isinstance(execute(Design.model_validate(raw), config()).nodes["n_llm"], SelfHostedLlm)
+    assert execute(design("agent-self-hosted"), config()).nodes["n_agent"].llm.__class__ is SelfHostedLlm
+
+
+def test_the_self_hosted_template_runs_end_to_end():
+    result = simulate(design("agent-self-hosted"), config(duration_s=60))
+
+    [series] = result.gpu
+    assert series.node_id == "n_llm"
+    assert [p.t for p in series.points] == list(range(1, 61))  # a snapshot at the end of every second
+    assert all(0 <= p.kv_pct <= 1 and 0 <= p.batch <= 32 for p in series.points)  # maxBatchSize 32
+    assert max(p.batch for p in series.points) > 0
+    assert result.summary.completed > 0 and result.summary.ttft_ms is not None
+    assert result.summary.ttft_ms.p50 < result.summary.latency_ms.p50  # first token well before the end
+    llm = next(n for n in result.nodes if n.id == "n_llm")
+    assert 0 < llm.util_avg <= 1  # the batch as its slots: a GPU at work no longer reads 0%
+    assert result.cost.monthly_total_usd == pytest.approx(2 * 30 + 0.8 * 730 + 15 + 70)  # API, L4, tools, DB
+
+
+def test_every_reserved_byte_of_kv_is_freed_once_the_traffic_drains():
+    run = execute(design("agent-self-hosted"), config(duration_s=30))
+    run.env.run(10_000_000)  # arrivals stopped at 30 s; let every request in flight finish
+    llm = run.nodes["n_llm"]
+
+    assert [(r.kv_used, r.load) for r in llm.replicas] == [(0, 0)]  # exactly 0: ints, no float drift
+    assert all(r.end is not None for r in run.metrics.requests)
 
 
 # ── The result (§7.4) ────────────────────────────────────────────────────────

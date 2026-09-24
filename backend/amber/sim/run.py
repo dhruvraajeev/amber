@@ -22,11 +22,12 @@ from amber.sim.nodes.agent import Agent
 from amber.sim.nodes.cache import Cache
 from amber.sim.nodes.database import Database
 from amber.sim.nodes.llm_hosted import HostedLlm
+from amber.sim.nodes.llm_selfhosted import SelfHostedLlm
 from amber.sim.nodes.load_balancer import LoadBalancer
 from amber.sim.nodes.service import Service
 from amber.sim.nodes.users import Users
 
-# Node kinds that have a class today. Self-hosted LLMs arrive in Step 21.
+# One class per node kind, except `llm`, whose class depends on its mode (`build_node`).
 KINDS = {
     "users": Users,
     "loadBalancer": LoadBalancer,
@@ -68,7 +69,7 @@ def simulate(
     timeline = run.metrics.timeline()
     rows = attribution(run.metrics.answered(), summary.latency_ms.p99)
     nodes = run.metrics.node_summaries(design, {line.node_id: line.usd for line in cost.breakdown})
-    gpu = []  # one series per self-hosted LLM node, which Step 21 adds
+    gpu = run.metrics.gpu_series()
     return RunResult(
         design_hash=design_hash(design),
         config=config,
@@ -119,12 +120,9 @@ def execute(
 
 def build_node(env: Environment, node: DesignNode, seed: int) -> Node:
     """The simulated node for one design node."""
-    if node.kind == "llm":
-        if not isinstance(node.params, HostedLlmParams):
-            raise NotImplementedError("self-hosted LLM nodes are not simulated yet")
-        return HostedLlm(env, node, seed)
-    if node.kind not in KINDS:
-        raise NotImplementedError(f"{node.kind} nodes are not simulated yet")
+    if node.kind == "llm":  # same kind, two models: the params' mode decides
+        llm = HostedLlm if isinstance(node.params, HostedLlmParams) else SelfHostedLlm
+        return llm(env, node, seed)
     return KINDS[node.kind](env, node, seed)
 
 

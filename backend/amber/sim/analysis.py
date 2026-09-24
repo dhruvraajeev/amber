@@ -62,6 +62,7 @@ def bottlenecks(
     once per node, and the 70% headroom warning stays quiet when the 90% capacity rule already fired.
     """
     found: list[tuple[int, Bottleneck]] = []  # (row in RULES, finding)
+    gpu_ids = {series.node_id for series in gpu}  # self-hosted LLMs, whose rejects are calls too big for KV
 
     def add(rule: int, node_id: str, **values: object) -> None:
         severity, message = RULES[rule]
@@ -77,7 +78,7 @@ def bottlenecks(
             add(6, n.id, util=_pct(n.util_avg))
         if _queue_growing([p.nodes[n.id].queue for p in timeline]):
             add(1, n.id)
-        if n.rejects and n.kind == "llm":  # only a hosted LLM turns calls away, with a 429
+        if n.rejects and n.kind == "llm" and n.id not in gpu_ids:  # a hosted LLM's rejects are 429s
             add(3, n.id, n=n.rejects)
         elif n.rejects:
             add(2, n.id, n=n.rejects, pct=f"{100 * n.rejects / max(1, summary.requests):.1f}")

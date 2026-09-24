@@ -13,6 +13,7 @@ from pydantic import TypeAdapter, ValidationError
 from amber.contracts import Design, RunConfig, TrafficProfile, ValidationIssue
 from amber.presets import presets
 from amber.sim.arrivals import expected_requests, peak
+from amber.sim.nodes.llm_selfhosted import PROFILES
 
 MAX_NODES = 50
 MAX_EDGES = 100
@@ -20,11 +21,14 @@ MIN_DURATION_S, MAX_DURATION_S = 10, 600  # also enforced by RunConfig's field r
 MAX_RPS = 5000
 MAX_REQUESTS = 200_000
 
-# (llm mode, params field) → the preset file its id must appear in.
+# (llm mode, params field) → the ids it may name: a shared/presets file, or the timing profiles.
 PRESET_FIELDS = {
-    ("hosted", "presetId"): "hosted_llms",
-    ("selfHosted", "gpuPresetId"): "gpus",
-    ("selfHosted", "modelPresetId"): "models",
+    ("hosted", "presetId"): lambda: presets("hosted_llms"),
+    ("selfHosted", "gpuPresetId"): lambda: presets("gpus"),
+    ("selfHosted", "modelPresetId"): lambda: presets("models"),
+    # ponytail: backend only; validate.ts checks profileId is non-empty, because the one profile lives
+    # in Python until Step 27 writes shared/profiles/. The UI still shows this 422 on the node.
+    ("selfHosted", "profileId"): lambda: PROFILES,
 }
 
 _traffic = TypeAdapter(TrafficProfile)
@@ -262,16 +266,14 @@ def _back_edge(nodes: list[dict], out: dict[str, list[dict]]) -> dict | None:
 
 
 def _unknown_presets(node: dict) -> list[tuple[str, str]]:
-    """(path, id) for each preset id on an LLM node that isn't in shared/presets."""
+    """(path, id) for each preset or profile id on an LLM node that names nothing that exists."""
     params = node.get("params")
     if node["kind"] != "llm" or not isinstance(params, dict):
         return []
     return [
         (f"params.{field}", params[field])
-        for (mode, field), file in PRESET_FIELDS.items()
-        if params.get("mode") == mode
-        and isinstance(params.get(field), str)
-        and params[field] not in presets(file)
+        for (mode, field), known in PRESET_FIELDS.items()
+        if params.get("mode") == mode and isinstance(params.get(field), str) and params[field] not in known()
     ]
 
 

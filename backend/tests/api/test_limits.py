@@ -7,6 +7,7 @@ import pytest
 
 from amber.api import routes_sim
 from amber.api.limits import MAX_CONCURRENT_SIMULATIONS, SIMULATIONS_PER_MINUTE, RateLimiter
+from amber.sim.kernel import SimTimeout
 
 # ── Rate limit: 30 simulations a minute per IP ───────────────────────────────
 
@@ -62,7 +63,7 @@ def test_at_most_two_simulations_run_at_once(client, templates, monkeypatch):
         time.sleep(0.2)
         with lock:
             running -= 1
-        raise NotImplementedError("stub")
+        raise SimTimeout  # any quick answer will do; a 504 is one
 
     monkeypatch.setattr(routes_sim, "simulate", slow_simulate)
     body = {"design": templates["classic-web-app"], "config": {"durationS": 10, "seed": 1}}

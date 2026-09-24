@@ -91,11 +91,22 @@ def test_a_body_that_isnt_an_object_is_a_schema_issue(client):
     assert [i["code"] for i in response.json()["issues"]] == ["SCHEMA"]
 
 
-def test_node_kinds_the_simulator_cant_run_yet_are_a_501(client, templates):
+def test_a_self_hosted_llm_runs_and_reports_its_gpu(client, templates):
     response = client.post("/api/simulate", json={"design": templates["agent-self-hosted"], "config": CONFIG})
-    assert response.status_code == 501
-    detail = "Self-hosted LLM nodes are not simulated yet."  # "LLM" kept upper-case
-    assert response.json() == {"error": "not_implemented", "detail": detail}
+    assert response.status_code == 200
+    [series] = response.json()["gpu"]
+    assert series["nodeId"] == "n_llm"
+    assert len(series["points"]) == CONFIG["durationS"]
+    assert set(series["points"][0]) == {"t", "kvPct", "batch", "waiting"}
+
+
+def test_an_unknown_timing_profile_is_a_param_range_issue(client, templates):
+    design = json.loads(json.dumps(templates["agent-self-hosted"]))
+    next(n for n in design["nodes"] if n["id"] == "n_llm")["params"]["profileId"] = "h100-measured"
+    response = client.post("/api/simulate", json={"design": design, "config": CONFIG})
+    assert response.status_code == 422
+    [issue] = response.json()["issues"]
+    assert (issue["code"], issue["nodeId"], issue["path"]) == ("PARAM_RANGE", "n_llm", "params.profileId")
 
 
 # ── Other errors: always {"error", "detail"} ─────────────────────────────────

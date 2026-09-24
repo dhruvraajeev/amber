@@ -37,7 +37,7 @@ async def validate_design(request: Request) -> ValidationErrorBody:
     responses={422: {"model": ValidationErrorBody, "description": "The design can't run as it is."}},
 )
 async def simulate_design(request: Request) -> RunResult | JSONResponse:
-    """`{design, config}` → the RunResult (§7.4), or 422 with the issues, 429, 504 or 501."""
+    """`{design, config}` → the RunResult (§7.4), or 422 with the issues, 429 or 504."""
     _take_permit(request)
     design, config = _design_and_config(await read_json(request))
     config = {} if config is None else config  # a run needs one: missing fields come back as issues
@@ -58,9 +58,6 @@ async def simulate_design(request: Request) -> RunResult | JSONResponse:
                 f"This run took longer than {MAX_WALL_S:g} s to simulate, so it was stopped. "
                 "Shorten it or lower the traffic.",
             ) from None
-        except NotImplementedError as e:  # self-hosted LLM nodes, until Step 21
-            detail = str(e)  # not .capitalize(), which would lowercase "LLM"
-            raise ApiError(501, "not_implemented", f"{detail[:1].upper()}{detail[1:]}.") from None
 
 
 def _take_permit(request: Request) -> None:

@@ -4,7 +4,8 @@ Two kinds of data go into a bucket:
 - Per request, sorted in after the run: an arrival counts in the bucket where the request was created;
   its outcome (status, latency) counts in the bucket where it ended.
 - Per node, sampled live: a small process wakes at the end of every bucket and reads each node's
-  counters (`Node.resources`, `served`, `rejects`), keeping what changed since the last bucket.
+  counters (`Node.resources`, `served`, `rejects`), keeping what changed since the last bucket. It
+  also takes one GPU snapshot per self-hosted LLM node (`RunResult.gpu`, §7.4).
 
 Utilization is `busy slot-ms / (slots × bucket ms)`, straight from the kernel's integral. It is never
 clamped: a value above 1 would mean a modelling bug, and hiding it would hide the bug.
@@ -28,6 +29,7 @@ from typing import NamedTuple
 
 from amber.contracts import (
     Design,
+    GpuSeries,
     LatencySummary,
     NodePoint,
     NodeSummary,
@@ -38,6 +40,7 @@ from amber.contracts import (
 )
 from amber.sim.kernel import Environment, Process, ProcessGen, Timeout
 from amber.sim.nodes import Node
+from amber.sim.nodes.llm_selfhosted import SelfHostedLlm
 from amber.sim.nodes.users import Users
 from amber.sim.request import Request
 
@@ -79,10 +82,14 @@ class Metrics:
             for i in range(math.ceil(duration_ms / BUCKET_MS))
         ]
         self._warmup_s = config.warmup_s
+        self._gpu = {
+            nid: GpuSeries(node_id=nid, points=[]) for nid, n in nodes.items() if isinstance(n, SelfHostedLlm)
+        }
         Process(env, self._sample())
 
     def _sample(self) -> ProcessGen:
-        """At the end of each bucket, store what every node's counters did during it."""
+        """At the end of each bucket, store what every node's counters did during it, and snapshot
+        every GPU at that instant (its point's `t` is that end, in seconds)."""
         last = {node_id: (0.0, 0, 0) for node_id in self.nodes}  # busy slot-ms, rejects, served
         for bucket in self._buckets:
             yield Timeout(self.env, bucket.width_ms)
@@ -101,6 +108,12 @@ class Metrics:
                     node.served - was_served,
                 )
                 last[node_id] = (busy, node.rejects, node.served)
+            for node_id, series in self._gpu.items():
+                series.points.append(self.nodes[node_id].gpu_point(self.env.now / 1000))
+
+    def gpu_series(self) -> list[GpuSeries]:
+        """One series per self-hosted LLM node, in design order, one point per simulated second."""
+        return list(self._gpu.values())
 
     @cached_property
     def requests(self) -> list[Request]:
