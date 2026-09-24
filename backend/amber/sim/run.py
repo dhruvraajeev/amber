@@ -18,6 +18,7 @@ from amber.sim.cost import monthly_cost
 from amber.sim.kernel import Environment
 from amber.sim.metrics import Metrics
 from amber.sim.nodes import Node
+from amber.sim.nodes.agent import Agent
 from amber.sim.nodes.cache import Cache
 from amber.sim.nodes.database import Database
 from amber.sim.nodes.llm_hosted import HostedLlm
@@ -25,13 +26,14 @@ from amber.sim.nodes.load_balancer import LoadBalancer
 from amber.sim.nodes.service import Service
 from amber.sim.nodes.users import Users
 
-# Node kinds that have a class today. `agent` and self-hosted LLMs arrive in Steps 20 and 21.
+# Node kinds that have a class today. Self-hosted LLMs arrive in Step 21.
 KINDS = {
     "users": Users,
     "loadBalancer": LoadBalancer,
     "service": Service,
     "cache": Cache,
     "database": Database,
+    "agent": Agent,
 }
 
 # node id -> a function drawing that node's own work time in ms. Test-only (plan §16): the
@@ -96,7 +98,11 @@ def execute(
     env = Environment()
     nodes = {node.id: build_node(env, node, config.seed) for node in design.nodes}
     for edge in design.edges:
-        nodes[edge.source].downstream.append(nodes[edge.target])
+        source, target = nodes[edge.source], nodes[edge.target]
+        if isinstance(source, Agent):  # an agent's edges carry a role: its one LLM, or a tool
+            source.connect(target, edge.role)
+        else:
+            source.downstream.append(target)
     for node_id, sampler in (work_samplers or {}).items():
         nodes[node_id].sample_work = sampler  # type: ignore[attr-defined]
 

@@ -76,15 +76,15 @@ downstream before it continues.
 | **Service** | `replicas × concurrencyPerReplica` worker slots, each replica with its own line. A request holds its slot for its own work *and* for every downstream call, in edge order — thread-per-request, so a slow database makes the service look busy too. Over the queue limit, the request is rejected. |
 | **Cache** | Every lookup costs its latency; a hit (probability `hitRate`) answers there, a miss continues down the single outgoing edge. |
 | **Database** | A connection pool with a waiting line, then the query time. Nothing downstream. |
+| **Agent** | Makes `1 + Poisson(llmCallsMean − 1)` LLM calls per request, so always at least one. Call *i* (counting from 0) sends `basePromptTokens + i × contextGrowthTokensPerStep` prompt tokens, because every step re-sends the conversation so far; that growth is where an agent's cost comes from. Between two LLM calls, never after the last, it makes `toolCallsPerStep` tool calls one after another: to its tool edges round robin (starting over with each request), or, with no tool edges, a `toolLatency` wait. Its own span is that wait time. No capacity limit of its own: it runs in its caller's slot. |
 | **Hosted LLM** | Waits for the first token, then streams the rest at a sampled tokens-per-second. A bucket of rate-limit permits refills continuously; a call that finds it empty gets a 429, backs off (`500 × 2^attempt` ms, capped at 8 s, plus jitter) and retries, and after the last retry the request fails as `rate_limited`. Cost accrues per prompt and output token. |
 
 Errors are statuses, not exceptions. A node that fails a request sets its status and returns; every
 caller checks, stops its remaining downstream calls, releases what it is holding, and returns too. A
 request keeps the first error that happened to it.
 
-*Not yet built:* the agent node (multi-step LLM calls with growing context) and the self-hosted LLM
-scheduler (continuous batching, KV-cache admission, speculative decoding). Designs using them are
-refused rather than approximated.
+*Not yet built:* the self-hosted LLM scheduler (continuous batching, KV-cache admission, speculative
+decoding). Designs using it are refused rather than approximated.
 
 ## Measurement (`sim/metrics.py`)
 

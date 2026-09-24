@@ -58,8 +58,9 @@ async def simulate_design(request: Request) -> RunResult | JSONResponse:
                 f"This run took longer than {MAX_WALL_S:g} s to simulate, so it was stopped. "
                 "Shorten it or lower the traffic.",
             ) from None
-        except NotImplementedError as e:  # agent and self-hosted LLM nodes, until Steps 20 and 21
-            raise ApiError(501, "not_implemented", f"{str(e).capitalize()}.") from None
+        except NotImplementedError as e:  # self-hosted LLM nodes, until Step 21
+            detail = str(e)  # not .capitalize(), which would lowercase "LLM"
+            raise ApiError(501, "not_implemented", f"{detail[:1].upper()}{detail[1:]}.") from None
 
 
 def _take_permit(request: Request) -> None:

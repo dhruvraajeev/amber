@@ -94,7 +94,8 @@ def test_a_body_that_isnt_an_object_is_a_schema_issue(client):
 def test_node_kinds_the_simulator_cant_run_yet_are_a_501(client, templates):
     response = client.post("/api/simulate", json={"design": templates["agent-self-hosted"], "config": CONFIG})
     assert response.status_code == 501
-    assert response.json() == {"error": "not_implemented", "detail": "Agent nodes are not simulated yet."}
+    detail = "Self-hosted LLM nodes are not simulated yet."  # "LLM" kept upper-case
+    assert response.json() == {"error": "not_implemented", "detail": detail}
 
 
 # ── Other errors: always {"error", "detail"} ─────────────────────────────────

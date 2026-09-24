@@ -50,7 +50,7 @@ class HostedLlm(Node):
         return self.call(req, *self.default_tokens)
 
     def call(self, req: Request, prompt_tokens: int, output_tokens: int) -> ProcessGen:
-        """One LLM call of the given size. The agent node (Step 20) calls this with growing prompts."""
+        """One LLM call of the given size. The agent node calls this with growing prompts."""
         started_at = self.env.now
         attempt = 0
         while not self._take_permit():

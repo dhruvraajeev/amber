@@ -79,7 +79,7 @@ def test_edges_become_downstream_links_in_edge_order():
 
 
 def test_node_kinds_that_no_class_exists_for_yet_say_so():
-    with pytest.raises(NotImplementedError, match="agent"):
+    with pytest.raises(NotImplementedError, match="self-hosted"):
         simulate(design("agent-self-hosted"), config())
 
 

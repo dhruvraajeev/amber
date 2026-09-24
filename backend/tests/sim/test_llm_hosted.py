@@ -53,7 +53,7 @@ def test_only_the_first_call_sets_first_token_and_explicit_sizes_are_billed():
     node = llm(env)
     req = Request("r", 0.0, float("inf"))
 
-    def agent_like():  # two calls in a row, the way Step 20's agent will make them
+    def agent_like():  # two calls in a row, the way the agent makes them
         yield from node.call(req, 1000, 64)
         yield from node.call(req, 2000, 128)
 
