@@ -179,10 +179,12 @@ function Summary({ result: r }: { result: RunResult }) {
   // Every way a request can fail, skipping the ones that didn't happen. `errors` = rejected + rate-limited.
   const failures: [number, string][] = [[s.rejected, 'rejected'], [s.errors - s.rejected, 'rate-limited'], [s.timeouts, 'timed out']]
   const lost = failures.filter(([n]) => n > 0).map(([n, what]) => `${count(n)} ${what}`)
+  // The summary counts each post-warmup arrival once with its own outcome; the rest were cut off by the end.
+  const running = s.requests - s.completed - s.errors - s.timeouts
   return (
     <div className="flex flex-col gap-3">
       <p className="text-[13px] text-muted">
-        <span className="text-text">{count(s.completed)} of {count(s.requests)} requests succeeded; p99 latency was {ms(s.latencyMs.p99)}.</span> {worst?.message}
+        <span className="text-text">{count(s.completed)} of {count(s.requests)} requests succeeded{running > 0 && `, ${count(running)} still running when the run ended`}; p99 latency was {ms(s.latencyMs.p99)}.</span> {worst?.message}
       </p>
       <dl className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
         <Tile label="Requests" value={s.requests} format={count} sub={`after ${r.config.warmupS} s warmup`} />

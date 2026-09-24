@@ -2,17 +2,21 @@
 
 Two kinds of data go into a bucket:
 - Per request, sorted in after the run: an arrival counts in the bucket where the request was created;
-  its outcome (status, latency, time to first token) counts in the bucket where it ended.
+  its outcome (status, latency) counts in the bucket where it ended.
 - Per node, sampled live: a small process wakes at the end of every bucket and reads each node's
   counters (`Node.resources`, `served`, `rejects`), keeping what changed since the last bucket.
 
 Utilization is `busy slot-ms / (slots × bucket ms)`, straight from the kernel's integral. It is never
 clamped: a value above 1 would mean a modelling bug, and hiding it would hide the bug.
 
-The first `warmupS` seconds are left out of the summary (the system starts empty, which flatters it)
-but stay in the timeline. A timeline over 300 buckets is merged in pairs. Merging keeps the raw counts
-and latencies, so a merged point is exact: its rates are totals over its whole width, and its
-percentiles come from all of its latencies, not from combining each bucket's percentiles.
+The summary describes one set of requests: those that arrived after the first `warmupS` seconds (the
+system starts empty, which flatters it), each counted once with its own outcome, as a benchmark counts
+the requests it sends. So `requests` = completed + errors + timeouts + those still running at the end.
+The timeline keeps every second, warmup included, and counts each outcome in the second it happened.
+
+A timeline over 300 buckets is merged in pairs. Merging keeps the raw counts and latencies, so a merged
+point is exact: its rates are totals over its whole width, and its percentiles come from all of its
+latencies, not from combining each bucket's percentiles.
 """
 
 import math
@@ -60,7 +64,6 @@ class Bucket:
     arrivals: int = 0
     ends: Counter[str] = field(default_factory=Counter)  # status -> requests that ended here
     latencies: list[float] = field(default_factory=list)  # ms, answered requests only
-    ttfts: list[float] = field(default_factory=list)  # ms, answered requests that reached an LLM
     nodes: dict[str, NodeSample] = field(default_factory=dict)
 
 
@@ -117,8 +120,6 @@ class Metrics:
             bucket.ends[req.status] += 1
             if req.status in ANSWERED:
                 bucket.latencies.append(req.end - req.created_at)
-                if req.first_token_at is not None:
-                    bucket.ttfts.append(req.first_token_at - req.created_at)
         return self._buckets
 
     @property
@@ -126,24 +127,34 @@ class Metrics:
         """The buckets after warmup; all of them if warmup covers the whole run."""
         return [b for b in self.buckets if b.t >= self._warmup_s] or self.buckets
 
-    def answered(self) -> list[Request]:
-        """Requests answered in the measured buckets (ok or timed out): what attribution looks at."""
+    @cached_property
+    def measured_requests(self) -> list[Request]:
+        """The requests the summary describes: those that arrived after warmup. Read after the run."""
         start_ms = self.measured[0].t * 1000
-        return [r for r in self.requests if r.status in ANSWERED and start_ms <= r.end < self._duration_ms]
+        return [r for r in self.requests if r.created_at >= start_ms]
+
+    @cached_property
+    def finished(self) -> list[Request]:
+        """Measured requests with an outcome; the rest were still running when the run stopped."""
+        return [r for r in self.measured_requests if r.end is not None and r.end < self._duration_ms]
+
+    def answered(self) -> list[Request]:
+        """Finished requests that got a response, late or not: what latency and attribution look at."""
+        return [r for r in self.finished if r.status in ANSWERED]
 
     def summary(self) -> Summary:
-        measured = self.measured
-        ends = sum((b.ends for b in measured), Counter())
-        latencies = [x for b in measured for x in b.latencies]
-        ttfts = [x for b in measured for x in b.ttfts]
+        ends = Counter(r.status for r in self.finished)
+        answered = self.answered()
+        latencies = [r.end - r.created_at for r in answered]
+        ttfts = [r.first_token_at - r.created_at for r in answered if r.first_token_at is not None]
         finished = ends.total()
         return Summary(
-            requests=sum(b.arrivals for b in measured),
+            requests=len(self.measured_requests),
             completed=ends["ok"],
             errors=sum(ends[s] for s in ERRORS),
             timeouts=ends["timeout"],
             rejected=ends["rejected"],
-            throughput_rps=ends["ok"] / _seconds(measured),
+            throughput_rps=ends["ok"] / _seconds(self.measured),
             error_rate=(finished - ends["ok"]) / finished if finished else 0.0,
             latency_ms=LatencySummary(**_percentiles(latencies), max=max(latencies, default=0.0)),
             ttft_ms=Percentiles(**_percentiles(ttfts)) if ttfts else None,

@@ -102,7 +102,9 @@ def test_a_run_reports_traffic_nodes_cost_and_findings():
     assert result.design_hash == design_hash(design("classic-web-app"))
     assert result.config == config(duration_s=30)
     assert result.summary.requests == pytest.approx(200 * 25, rel=0.05)  # 200 rps, warmup excluded
-    assert result.summary.completed == result.summary.requests  # nothing is overloaded here
+    s = result.summary
+    assert s.errors == s.timeouts == 0  # nothing is overloaded here
+    assert 0 <= s.requests - s.completed < 10  # only the last few ms of arrivals are still running
     assert [n.id for n in result.nodes] == [n["id"] for n in template("classic-web-app")["nodes"]]
     assert len(result.timeline) == 30  # one point per second, well under the 300-point cap
     assert result.cost.monthly_total_usd == 4 * 30 + 25 + 60  # 4 API replicas, cache, database

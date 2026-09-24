@@ -66,10 +66,10 @@ def test_queue_peak_rejects_and_throughput_per_bucket():
     assert (second.queue, second.rejects, second.throughput_rps) == (0, 0, 0)
 
 
-def test_warmup_is_left_out_of_the_summary_but_kept_in_the_timeline():
+def test_the_summary_counts_post_warmup_arrivals_each_with_its_own_outcome():
     reqs = [
         req(500, 700),  # all inside warmup
-        req(1500, 2500),  # arrives during warmup, ends after: only its outcome counts
+        req(1500, 2500),  # arrives during warmup, ends after: timeline only, not the summary
         req(2100, 2400, first_token_ms=2200),
         req(3000, 3500),
         req(3000, 9000, "timeout"),
@@ -80,12 +80,14 @@ def test_warmup_is_left_out_of_the_summary_but_kept_in_the_timeline():
     metrics = with_requests(10, reqs, warmup_s=2)
 
     s = metrics.summary()
-    assert (s.requests, s.completed, s.timeouts, s.rejected, s.errors) == (6, 3, 1, 1, 2)
-    assert s.error_rate == 3 / 6  # of the 6 that finished after warmup, 3 weren't ok
-    assert s.throughput_rps == 3 / 8
-    assert (s.latency_ms.p50, s.latency_ms.max) == (750, 6000)  # of 300, 500, 1000, 6000 ms
+    assert (s.requests, s.completed, s.timeouts, s.rejected, s.errors) == (6, 2, 1, 1, 2)
+    running = s.requests - s.completed - s.timeouts - s.errors
+    assert running == 1  # every measured request is accounted for, the one in flight included
+    assert s.error_rate == 3 / 5  # of the 5 that finished, 3 weren't ok
+    assert s.throughput_rps == 2 / 8
+    assert (s.latency_ms.p50, s.latency_ms.max) == (500, 6000)  # of 300, 500, 6000 ms
     assert (s.ttft_ms.p50, s.ttft_ms.p99) == (100, 100)
-    assert sorted(r.created_at for r in metrics.answered()) == [1500, 2100, 3000, 3000]
+    assert sorted(r.created_at for r in metrics.answered()) == [2100, 3000, 3000]
 
     timeline = metrics.timeline()
     assert [p.t for p in timeline] == list(range(10))

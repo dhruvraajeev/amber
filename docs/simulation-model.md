@@ -96,6 +96,11 @@ bucket it was created in, an outcome into the bucket it ended in.
   1 would mean a bug in the model, and hiding it would hide the bug.
 - **Warmup** (5 s by default) is left out of the summary, because a system that starts empty flatters
   itself, but it stays in the timeline so you can see the ramp.
+- **The summary follows requests, not seconds.** It covers the requests that arrived after warmup, each
+  counted once with its own outcome — the way a load test counts the requests it sends. A request that
+  arrived during warmup never enters it, even if it finishes later. So requests = succeeded + failed +
+  timed out + still running when the run ended. The timeline instead counts each outcome in the second
+  it happened, which is what a throughput-over-time chart needs.
 - **Downsampling**: the timeline is capped at 300 points, so runs longer than 300 s merge buckets in
   pairs. A merged point keeps the underlying counts and latency values, so its rates are true totals
   over its full width and its percentiles come from all of its latencies — not from averaging each
@@ -149,3 +154,5 @@ All of these are deliberate. They are listed in the app under "Model assumptions
 8. **Monthly cost is extrapolated** from the simulated window, as if that traffic ran all month.
 9. **One queue discipline: FIFO.** No priorities, no retries between your own services, no circuit
    breakers.
+10. **The run stops at its duration.** Requests still running then have no outcome and no latency,
+    so the summary leaves them out of the percentiles (it reports how many there were).

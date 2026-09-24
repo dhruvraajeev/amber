@@ -74,6 +74,6 @@ const ASSUMPTIONS = [
   'Self-hosted LLMs never preempt a request once admitted; requests that don’t fit wait.',
   'Prefill and decode times grow linearly with tokens and batch size.',
   'Hosted LLM APIs have unlimited concurrency; only their rate limit turns requests away.',
-  'Percentiles over long runs are approximate, because the timeline is downsampled.',
+  'Results cover requests that arrive after warmup; any still running when the run ends have no latency yet.',
   'Monthly cost assumes the simulated traffic pattern repeats all month.',
 ]
