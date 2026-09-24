@@ -14,7 +14,7 @@ import { useShallow } from 'zustand/react/shallow'
 import Inspector from '../inspector/Inspector'
 import { validate } from '../lib/validate'
 import { useStore } from '../store'
-import type { NodeKind } from '../types/contracts'
+import type { NodeKind } from '../api/api'
 import CostTicker from './CostTicker'
 import PlaybackBar from '../run/PlaybackBar'
 import RunStatus from './RunStatus'
@@ -54,9 +54,11 @@ function Flow() {
   // or it hides the node. Sizes are view state, so they stay here rather than in the design.
   const [sizes, setSizes] = useState<Record<string, Size>>({})
 
-  // Re-checked on every edit; ≤50 nodes keeps this cheap. Flagged nodes and edges get an `invalid` class.
+  // Re-checked on every edit; ≤50 nodes keeps this cheap. Flagged nodes and edges get an `invalid` class,
+  // as do those named by the last refused run (the backend's 422), until the next run.
   const issues = useMemo(() => validate(design), [design])
-  const flagged = new Set(issues.flatMap((i) => [i.nodeId, i.edgeId]))
+  const refused = useStore((s) => s.issues)
+  const flagged = new Set([...issues, ...refused].flatMap((i) => [i.nodeId, i.edgeId]))
   const view = <T extends { id: string }>(x: T) => ({ ...x, selected: x.id === selectedId, className: flagged.has(x.id) ? 'invalid' : undefined })
   const nodes: FlowNode[] = design.nodes.map((n) => view({ ...toFlowNode(n), measured: sizes[n.id] }))
   const edges: FlowEdge[] = design.edges.map((e) => view(toFlowEdge(e)))

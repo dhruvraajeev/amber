@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Design, RunConfig } from '../types/contracts'
+import type { Design, RunConfig } from '../api/api'
 import { RULE_CODES, validate } from './validate'
 
 // Each fixture lists the exact set of codes it must produce. The backend (Step 12) runs the same files.

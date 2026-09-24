@@ -1,5 +1,5 @@
 import { count, pct } from '../lib/format'
-import type { RunResult } from '../types/contracts'
+import type { RunResult } from '../api/api'
 import LineChart from './LineChart'
 
 // Self-hosted LLM replicas: KV-cache use and the batch. Two charts per node, since a share and a

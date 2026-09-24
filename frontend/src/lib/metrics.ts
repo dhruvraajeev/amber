@@ -1,4 +1,4 @@
-import type { RunConfig, RunResult } from '../types/contracts'
+import type { RunConfig, RunResult } from '../api/api'
 import { ms, pct, rps, usd } from './format'
 
 // The headline metrics Compare shows, and which direction counts as better for each.

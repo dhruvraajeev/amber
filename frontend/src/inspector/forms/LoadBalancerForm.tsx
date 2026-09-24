@@ -1,4 +1,4 @@
-import type { LoadBalancerParams } from '../../types/contracts'
+import type { LoadBalancerParams } from '../../api/api'
 import { DistField, SelectField, type FormProps } from '../fields'
 
 export default function LoadBalancerForm({ params: p, set, err }: FormProps<LoadBalancerParams>) {

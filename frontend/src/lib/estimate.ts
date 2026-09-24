@@ -2,7 +2,7 @@
 // computed from the traffic profile instead of by simulating. The backend mirrors this
 // in sim/arrivals.py to reject oversized runs with a 422, so keep the formulas identical.
 
-import type { Design, TrafficProfile } from '../types/contracts'
+import type { Design, TrafficProfile } from '../api/api'
 
 /** Seconds of `[startS, startS + lengthS)` that fall inside `[0, durationS)`. */
 function overlapS(startS: number, lengthS: number, durationS: number): number {

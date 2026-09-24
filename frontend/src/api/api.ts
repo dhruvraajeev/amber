@@ -1,30 +1,39 @@
-// Everything the UI asks the backend (§11.5). Phase 0 has no backend, so each call is answered
-// locally: `simulate` by the seeded fake, the rest by the same code and files the backend will use.
-// Phase 2 swaps these bodies for fetch('/api/...') and removes the "Demo data" badge.
+// Everything the UI asks the backend (§9, §11.5). In dev, Vite proxies /api to the backend on :8000.
 
-import databases from '@shared/presets/databases.json'
-import gpus from '@shared/presets/gpus.json'
-import hostedLlms from '@shared/presets/hosted_llms.json'
-import models from '@shared/presets/models.json'
-import services from '@shared/presets/services.json'
-import { validate as check } from '../lib/validate'
-import type { Design, RunConfig, ValidationIssue } from '../types/contracts'
-import { fakeSimulate } from './fake'
+import type { Design, LlmNode, RunConfig, RunResult, UsersParams, ValidationIssue } from './generated'
 
-const templates = Object.values(
-  import.meta.glob<Design>('@shared/templates/*.json', { eager: true, import: 'default' }),
-)
+// The §7 contracts, generated from the backend's Pydantic models: `npm run gen:types` after changing
+// backend/amber/contracts.py. The aliases below name the unions that the schema only has inline.
+export type * from './generated'
+export type DesignNode = Design['nodes'][number]
+export type NodeKind = DesignNode['kind']
+export type NodeParamsByKind = { [K in NodeKind]: Extract<DesignNode, { kind: K }>['params'] }
+export type TrafficProfile = UsersParams['traffic']
+export type LlmParams = LlmNode['params']
 
-export const simulate = fakeSimulate
+export const simulate = (design: Design, config: RunConfig) => call<RunResult>('simulate', { design, config })
 
-export async function validate(design: Design, config?: RunConfig): Promise<ValidationIssue[]> {
-  return check(design, config)
+export const validate = (design: Design, config?: RunConfig) =>
+  call<{ issues: ValidationIssue[] }>('validate', { design, config }).then((body) => body.issues)
+
+export const getPresets = () => call<Record<string, unknown[]>>('presets')
+
+export const getTemplates = () => call<Design[]>('templates')
+
+/** A refused request, as issues the run drawer can list: a 422's own, or the `{error, detail}` of a 429, 504, … */
+export class ApiError extends Error {
+  issues: ValidationIssue[]
+  constructor(issues: ValidationIssue[]) {
+    super(issues.map((i) => i.message).join(' ') || 'Request failed')
+    this.issues = issues
+  }
 }
 
-export async function getPresets() {
-  return { gpus, models, hostedLlms, databases, services }
-}
-
-export async function getTemplates(): Promise<Design[]> {
-  return templates
+async function call<T>(path: string, body?: unknown): Promise<T> {
+  const init = body === undefined ? undefined : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  const res = await fetch(`/api/${path}`, init)
+  const json = await res.json().catch(() => null) // a proxy error page, or no backend at all
+  if (res.ok && json !== null) return json as T
+  if (json?.issues) throw new ApiError(json.issues)
+  throw new ApiError(json?.detail ? [{ code: json.error, message: json.detail }] : [])
 }

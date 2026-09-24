@@ -2,7 +2,7 @@ import gpus from '@shared/presets/gpus.json'
 import hostedLlms from '@shared/presets/hosted_llms.json'
 import models from '@shared/presets/models.json'
 import { LLM_DEFAULTS } from '../../canvas/map'
-import type { HostedLlmParams, LlmParams, SelfHostedLlmParams } from '../../types/contracts'
+import type { HostedLlmParams, LlmParams, SelfHostedLlmParams } from '../../api/api'
 import { DistField, NumberField, SelectField, TextField, ToggleField, type FormProps } from '../fields'
 
 // The form swaps entirely on `mode`: hosted APIs and self-hosted GPUs share no fields.

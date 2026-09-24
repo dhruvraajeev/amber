@@ -1,4 +1,4 @@
-import type { NodeKind } from '../types/contracts'
+import type { NodeKind } from '../api/api'
 import { KINDS } from './map'
 
 export const DRAG_MIME = 'application/amber-kind'

@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import TopBar from '../layout/TopBar'
 import { configDiff, delta, METRICS, type Verdict } from '../lib/metrics'
 import { useStore } from '../store'
-import type { RunResult } from '../types/contracts'
+import type { RunResult } from '../api/api'
 
 const VERDICT: Record<Verdict, { word: string; className: string }> = {
   better: { word: 'better', className: 'border-ok/30 bg-ok/10 text-ok' },

@@ -1,6 +1,6 @@
 import { CircleCheck, TriangleAlert } from 'lucide-react'
 import { KINDS, type NodeData } from '../canvas/map'
-import type { DesignNode, ValidationIssue } from '../types/contracts'
+import type { DesignNode, ValidationIssue } from '../api/api'
 import { TextField, type Errors } from './fields'
 import AgentForm from './forms/AgentForm'
 import CacheForm from './forms/CacheForm'

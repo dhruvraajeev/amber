@@ -1,5 +1,5 @@
 import databases from '@shared/presets/databases.json'
-import type { DatabaseParams } from '../../types/contracts'
+import type { DatabaseParams } from '../../api/api'
 import { DistField, NumberField, SelectField, type FormProps } from '../fields'
 
 const PRESETS = [

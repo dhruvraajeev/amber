@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStore } from '../store'
 import { lastPoint } from '../store/runSlice'
-import type { DesignEdge, RunResult, TimelinePoint } from '../types/contracts'
+import type { DesignEdge, RunResult, TimelinePoint } from '../api/api'
 
 // Timeline playback (§11.3). The run slice holds `playhead` and `playing`; this file moves the
 // playhead forward and gives the canvas what each node and edge looks like at that moment.

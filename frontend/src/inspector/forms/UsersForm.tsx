@@ -1,4 +1,4 @@
-import type { TrafficProfile, UsersParams } from '../../types/contracts'
+import type { TrafficProfile, UsersParams } from '../../api/api'
 import { NumberField, SelectField, type FormProps } from '../fields'
 
 const TYPES = [

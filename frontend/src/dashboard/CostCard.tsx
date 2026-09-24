@@ -1,5 +1,5 @@
 import { pct, usd } from '../lib/format'
-import type { RunResult } from '../types/contracts'
+import type { RunResult } from '../api/api'
 
 // Estimated monthly cost, biggest line first, with the assumptions behind it (§8.10).
 export default function CostCard({ result, label }: { result: RunResult; label: (id: string) => string }) {

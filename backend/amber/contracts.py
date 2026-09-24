@@ -1,4 +1,5 @@
-"""Pydantic mirror of the data contracts in plan §7 (frontend/src/types/contracts.ts).
+"""The data contracts of plan §7, and their single source: the frontend's types are generated from these
+(`npm run gen:types` writes frontend/src/api/generated.ts; CI fails if it is stale).
 
 Python fields are snake_case; JSON is camelCase, exactly as the frontend writes it. Field ranges come
 from the §7.2/§7.3 comments and match PARAM_RANGE in frontend/src/lib/validate.ts. Graph rules (§7.6)
@@ -9,6 +10,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
+from pydantic.json_schema import SkipJsonSchema
 
 NodeKind = Literal["users", "loadBalancer", "service", "cache", "database", "agent", "llm"]
 
@@ -18,6 +20,10 @@ NonNegInt = Annotated[int, Field(ge=0)]
 NonNeg = Annotated[float, Field(ge=0)]  # rates, seconds, USD
 Replicas = Annotated[int, Field(ge=1, le=50)]
 QueueLimit = Annotated[int, Field(ge=0, le=10000)]  # waiting requests per replica/pool before 503
+
+# For optional fields: `T | Absent = None`. Responses drop None, so the field is either there or missing,
+# never null. Leaving null out of the schema makes the generated TypeScript `field?: T`, as §7 writes it.
+Absent = SkipJsonSchema[None]
 
 
 class Model(BaseModel):
@@ -227,11 +233,11 @@ class DesignEdge(Model):
     id: str
     source: str
     target: str
-    role: Literal["llm", "tool"] | None = None  # only on edges leaving an agent node
+    role: Literal["llm", "tool"] | Absent = None  # only on edges leaving an agent node
 
 
 class Design(Model):
-    id: str | None = None  # assigned by the backend on save
+    id: str | Absent = None  # assigned by the backend on save
     name: str
     version: Literal[1]
     nodes: list[DesignNode]
@@ -276,7 +282,7 @@ class Summary(Model):
     throughput_rps: float
     error_rate: float
     latency_ms: LatencySummary
-    ttft_ms: Percentiles | None = None
+    ttft_ms: Percentiles | Absent = None
 
 
 class NodePoint(Model):
@@ -340,12 +346,12 @@ class Cost(Model):
 
 class Bottleneck(Model):
     severity: Literal["info", "warn", "critical"]
-    node_id: str | None = None
+    node_id: str | Absent = None
     message: str
 
 
 class RunResult(Model):
-    run_id: str | None = None
+    run_id: str | Absent = None
     design_hash: str  # sha256 of canonical design JSON (sorted keys, no positions)
     config: RunConfig
     engine: Engine
@@ -364,9 +370,9 @@ class RunResult(Model):
 class ValidationIssue(Model):
     code: str
     message: str
-    node_id: str | None = None
-    edge_id: str | None = None
-    path: str | None = None
+    node_id: str | Absent = None
+    edge_id: str | Absent = None
+    path: str | Absent = None
 
 
 class ValidationErrorBody(Model):

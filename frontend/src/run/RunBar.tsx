@@ -5,7 +5,7 @@ import { estimateDesignRequests, rateAt } from '../lib/estimate'
 import { count } from '../lib/format'
 import { LIMITS } from '../lib/validate'
 import { useStore } from '../store'
-import type { Design, RunConfig } from '../types/contracts'
+import type { Design, RunConfig } from '../api/api'
 
 const WARMUP_S = 5 // §7.3 default; not exposed in the UI
 

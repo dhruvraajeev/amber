@@ -20,7 +20,7 @@ It models the inference layer realistically (hosted API vs self-hosted GPUs, con
 
 ## Operating Context
 
-One screen: palette, canvas, inspector, run bar, results drawer (summary, latency, load, GPU, cost, bottlenecks, attribution), timeline playback, a Compare page for two pinned runs, and a model-assumptions popover. Keyboard: Delete removes, Esc clears selection, R runs, Space plays/pauses. Until phase 2 the results come from a seeded fake, shown by a "Demo data" badge.
+One screen: palette, canvas, inspector, run bar, results drawer (summary, latency, load, GPU, cost, bottlenecks, attribution), timeline playback, a Compare page for two pinned runs, and a model-assumptions popover. Keyboard: Delete removes, Esc clears selection, R runs, Space plays/pauses.
 
 ## Capabilities and Constraints
 
@@ -38,7 +38,7 @@ One screen: palette, canvas, inspector, run bar, results drawer (summary, latenc
 
 ## Evidence on Hand
 
-Three starter templates (`shared/templates/`) and presets (`shared/presets/`). Results are demo data from `api/fake.ts` until the backend lands. No calibration numbers, users, or testimonials exist yet; don't invent them.
+Three starter templates (`shared/templates/`) and presets (`shared/presets/`). Results come from the real simulator through the backend API. No calibration numbers, users, or testimonials exist yet; don't invent them.
 
 ## Product Principles
 

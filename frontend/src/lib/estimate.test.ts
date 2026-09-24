@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import classicWebApp from '@shared/templates/classic-web-app.json'
-import type { Design, TrafficProfile } from '../types/contracts'
+import type { Design, TrafficProfile } from '../api/api'
 import { estimateDesignRequests, estimateRequests } from './estimate'
 
 // 10 rps everywhere, +100 rps between 20 s and 30 s.

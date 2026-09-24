@@ -1,5 +1,5 @@
 import { ms } from '../lib/format'
-import type { RunResult } from '../types/contracts'
+import type { RunResult } from '../api/api'
 import LineChart from './LineChart'
 
 // Latency percentiles over the run, from calm to hot: p50 warm white, p95 orange, p99 red.

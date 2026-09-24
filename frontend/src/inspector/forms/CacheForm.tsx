@@ -1,4 +1,4 @@
-import type { CacheParams } from '../../types/contracts'
+import type { CacheParams } from '../../api/api'
 import { DistField, NumberField, SliderField, type FormProps } from '../fields'
 
 export default function CacheForm({ params: p, set, err }: FormProps<CacheParams>) {

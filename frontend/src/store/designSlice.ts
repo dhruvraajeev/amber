@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand'
 import { newNode, type NodeData } from '../canvas/map'
 import { load } from '../lib/storage'
-import type { Design, DesignNode, NodeKind } from '../types/contracts'
+import type { Design, DesignNode, NodeKind } from '../api/api'
 import type { Store } from '.'
 
 export const AUTOSAVE_KEY = 'amber.design'

@@ -4,7 +4,7 @@
 import gpus from '@shared/presets/gpus.json'
 import hostedLlms from '@shared/presets/hosted_llms.json'
 import models from '@shared/presets/models.json'
-import type { Design, DesignEdge, DesignNode, LatencyDist, RunConfig, TrafficProfile, ValidationIssue } from '../types/contracts'
+import type { Design, DesignEdge, DesignNode, LatencyDist, RunConfig, TrafficProfile, ValidationIssue } from '../api/api'
 import { estimateDesignRequests } from './estimate'
 
 export const LIMITS = { nodes: 50, edges: 100, minDurationS: 10, maxDurationS: 600, rps: 5000, requests: 200_000 }

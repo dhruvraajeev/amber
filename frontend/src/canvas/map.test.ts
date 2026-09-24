@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import template from '@shared/templates/agent-self-hosted.json'
-import type { Design } from '../types/contracts'
+import type { Design } from '../api/api'
 import { canonicalDesign, designHash, KINDS, newNode, toFlowEdge, toFlowNode } from './map'
 
 const design = template as Design

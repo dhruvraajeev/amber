@@ -1,4 +1,4 @@
-import type { AgentParams } from '../../types/contracts'
+import type { AgentParams } from '../../api/api'
 import { DistField, NumberField, type FormProps } from '../fields'
 
 type NumKey = Exclude<keyof AgentParams, 'toolLatency'>

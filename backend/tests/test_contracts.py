@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from amber.contracts import Design, RunConfig, RunResult
+from amber.contracts import DatabaseParams, Design, RunConfig, RunResult
 from amber.presets import SHARED
 
 TEMPLATES = sorted((SHARED / "templates").glob("*.json"))
@@ -192,3 +192,16 @@ def test_run_result_optional_fields_round_trip():
     raw["summary"]["ttftMs"] = {"p50": 300, "p95": 700, "p99": 900}
     raw["bottlenecks"][0]["nodeId"] = "n_api"
     assert as_json(RunResult.model_validate(raw)) == raw
+
+
+# The preset files have no Pydantic model: the forms read them as they are. These are their invariants.
+@pytest.mark.parametrize("path", sorted((SHARED / "presets").glob("*.json")), ids=lambda p: p.stem)
+def test_presets_have_unique_ids_and_unverified_prices(path):
+    presets = load(path)
+    assert presets and len({p["id"] for p in presets}) == len(presets)
+    assert all(p["verifiedAt"] is None for p in presets)  # set only once someone checks the prices
+
+
+def test_database_presets_are_a_known_kind():
+    kinds = DatabaseParams.model_fields["preset"].annotation.__args__
+    assert {p["preset"] for p in load(SHARED / "presets" / "databases.json")} <= set(kinds)

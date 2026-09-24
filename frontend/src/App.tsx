@@ -7,14 +7,15 @@ import EmptyState from './layout/EmptyState'
 import TopBar from './layout/TopBar'
 import RunBar from './run/RunBar'
 import { useStore } from './store'
-import type { Design } from './types/contracts'
+import type { Design } from './api/api'
 
 // The editor page: §11.2's regions as floating panels on the lit ground. Column 1 is the palette
 // rail (rows 2–4); the canvas and inspector share row 2; the run bar and results sit beneath them.
 // The design lives in the store (and is autosaved), so a refresh reopens it instead of the empty state.
 export default function App() {
   const [templates, setTemplates] = useState<Design[]>([])
-  useEffect(() => void getTemplates().then(setTemplates), [])
+  const [offline, setOffline] = useState(false) // the templates come from the backend; a blank canvas doesn't
+  useEffect(() => void getTemplates().then(setTemplates, () => setOffline(true)), [])
   const hasDesign = useStore((s) => s.design !== null)
   const name = useStore((s) => s.design?.name)
   const loads = useStore((s) => s.loads)
@@ -53,7 +54,7 @@ export default function App() {
         <Canvas key={loads} />
       ) : (
         <main className="col-span-3 row-span-3 min-h-0">
-          <EmptyState templates={templates} onPick={loadTemplate} />
+          <EmptyState templates={templates} offline={offline} onPick={loadTemplate} />
         </main>
       )}
 

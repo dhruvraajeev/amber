@@ -2,7 +2,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { usd } from '../lib/format'
 import { useCountUp } from '../lib/useCountUp'
 import { useStore } from '../store'
-import type { Design, RunResult } from '../types/contracts'
+import type { Design, RunResult } from '../api/api'
 
 // The cost ticker on the canvas (§11.3): counts up to the run's monthly total when it arrives, and shows
 // what the month would cost if traffic stayed as it is at the playhead.

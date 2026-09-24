@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import classic from '@shared/templates/classic-web-app.json'
 import agent from '@shared/templates/agent-self-hosted.json'
 import { BLANK } from '../canvas/map'
-import type { Design, RunResult } from '../types/contracts'
+import type { Design, RunResult } from '../api/api'
 
 // The store autosaves to localStorage, so each test gets a fresh in-memory one and a fresh store.
 const saved = new Map<string, string>()
 vi.stubGlobal('localStorage', { getItem: (k: string) => saved.get(k) ?? null, setItem: (k: string, v: string) => saved.set(k, v) })
-vi.mock('../api/api', () => ({ simulate: vi.fn(async () => ({ designHash: 'x' })) }))
+vi.mock('../api/api', async (real) => ({ ...(await real()), simulate: vi.fn(async () => ({ designHash: 'x' })) }))
 
 const fresh = async () => {
   vi.resetModules()
@@ -72,6 +72,16 @@ describe('run slice', () => {
     await s.getState().run({ durationS: 60, seed: 1, warmupS: 5 })
     expect(s.getState().status).toBe('error')
     expect(s.getState().issues.map((i) => i.code)).toContain('NO_USERS')
+  })
+
+  it('keeps the backend’s refusal as issues, so the canvas can highlight them', async () => {
+    const s = await fresh()
+    const { ApiError, simulate } = await import('../api/api')
+    const issue = { code: 'PARAM_RANGE', message: 'Unknown preset.', nodeId: 'n_llm' }
+    vi.mocked(simulate).mockRejectedValueOnce(new ApiError([issue]))
+    s.getState().loadTemplate(classic as Design)
+    await s.getState().run({ durationS: 60, seed: 1, warmupS: 5 })
+    expect(s.getState()).toMatchObject({ status: 'error', issues: [issue] })
   })
 
   it('runs once even if asked twice, then pins at most two results', async () => {

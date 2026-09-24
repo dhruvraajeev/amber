@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand'
-import { simulate } from '../api/api'
+import { ApiError, simulate } from '../api/api'
 import { validate } from '../lib/validate'
-import type { RunConfig, RunResult, ValidationIssue } from '../types/contracts'
+import type { RunConfig, RunResult, ValidationIssue } from '../api/api'
 import type { Store } from '.'
 
 export type RunStatus = 'idle' | 'running' | 'done' | 'error'
@@ -37,8 +37,9 @@ export const runSlice: StateCreator<Store, [], [], RunSlice> = (set, get) => ({
     set({ status: 'running', issues: [], playing: false })
     try {
       set({ status: 'done', result: await simulate(design, config), playhead: 0 })
-    } catch {
-      set({ status: 'error' })
+    } catch (e) {
+      // The backend's refusal (its 422 issues, or why it said no) is shown and highlighted like our own.
+      set({ status: 'error', issues: e instanceof ApiError ? e.issues : [] })
     }
   },
   pin: () => {

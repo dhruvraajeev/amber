@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react'
 import { Bot, BrainCircuit, Database, Server, Split, Users, Zap, type LucideIcon } from 'lucide-react'
 import hostedLlms from '@shared/presets/hosted_llms.json'
-import type { Design, DesignEdge, DesignNode, LlmParams, NodeKind, NodeParamsByKind } from '../types/contracts'
+import type { Design, DesignEdge, DesignNode, LlmParams, NodeKind, NodeParamsByKind } from '../api/api'
 
 export const BLANK: Design = { name: 'Untitled design', version: 1, nodes: [], edges: [] }
 

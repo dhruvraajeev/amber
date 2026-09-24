@@ -1,4 +1,4 @@
-import type { NodeKind } from '../types/contracts'
+import type { NodeKind } from '../api/api'
 import { level } from './format'
 
 // How load looks on the canvas (§11.3). Every color is a theme token.

@@ -1,7 +1,7 @@
 import { hasCapacity } from '../lib/color'
 import { count, level, pct } from '../lib/format'
 import LevelIcon from '../ui/LevelIcon'
-import type { RunResult } from '../types/contracts'
+import type { RunResult } from '../api/api'
 
 // Average utilization per node, busiest first, with a tick at its peak. The bar's color, icon and
 // text all say the load level, so hue is never the only signal. Kinds without a capacity limit are left out.

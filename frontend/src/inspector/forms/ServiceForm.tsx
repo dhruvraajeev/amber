@@ -1,5 +1,5 @@
 import services from '@shared/presets/services.json'
-import type { ServiceParams } from '../../types/contracts'
+import type { ServiceParams } from '../../api/api'
 import { DistField, NumberField, SelectField, type FormProps } from '../fields'
 
 export default function ServiceForm({ params: p, set, err }: FormProps<ServiceParams>) {

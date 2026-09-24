@@ -2,8 +2,7 @@ import { GitCompareArrows, Info } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router'
 
-// Top bar (§11.2): the mark, page-specific controls (`children`), then Compare, the model assumptions,
-// and the "Demo data" badge, which stays until api.ts stops using the fake (phase 2, §11.5).
+// Top bar (§11.2): the mark, page-specific controls (`children`), then Compare and the model assumptions.
 // "Model" opens the assumptions (§8.11) in a native popover: Esc and clicking outside close it.
 export default function TopBar({ children, className = '' }: { children?: ReactNode; className?: string }) {
   return (
@@ -26,13 +25,6 @@ export default function TopBar({ children, className = '' }: { children?: ReactN
           <Info size={15} aria-hidden />
           Model
         </button>
-        <span
-          className="flex h-9 items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3.5 text-[13px] text-accent-2"
-          title="Results come from a built-in fake, not the simulator"
-        >
-          <span className="pulse-dot size-1.5 bg-accent text-accent" aria-hidden />
-          Demo data
-        </span>
       </nav>
       <div
         id="model-assumptions"

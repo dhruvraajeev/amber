@@ -1,5 +1,5 @@
 import { pct } from '../lib/format'
-import type { RunResult } from '../types/contracts'
+import type { RunResult } from '../api/api'
 
 const QUEUE = 'var(--series-3)' // red: waiting is the bad half
 const WORK = 'var(--series-2)'

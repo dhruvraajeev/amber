@@ -1,5 +1,5 @@
 import { ChevronRight, CircleAlert, Info, TriangleAlert } from 'lucide-react'
-import type { RunResult } from '../types/contracts'
+import type { RunResult } from '../api/api'
 
 const ICON = { critical: CircleAlert, warn: TriangleAlert, info: Info } as const
 const COLOR = { critical: 'text-crit', warn: 'text-warn', info: 'text-muted' } as const

@@ -1,6 +1,6 @@
 import { TriangleAlert } from 'lucide-react'
 import type { CSSProperties, ReactNode } from 'react'
-import type { LatencyDist } from '../types/contracts'
+import type { LatencyDist } from '../api/api'
 
 // The field kit (§11.6). Every field takes a one-sentence `help` (shown on hover) and an
 // optional `error` from the validator, rendered inline under the control.
