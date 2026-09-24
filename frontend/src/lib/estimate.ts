@@ -1,6 +1,6 @@
 // How many requests a run will send (plan §3): the area under the arrival-rate curve,
 // computed from the traffic profile instead of by simulating. The backend mirrors this
-// in Step 12 to reject oversized runs with a 422, so keep the formulas identical.
+// in sim/arrivals.py to reject oversized runs with a 422, so keep the formulas identical.
 
 import type { Design, TrafficProfile } from '../types/contracts'
 
