@@ -5,7 +5,7 @@ from collections import Counter
 from amber.contracts import LoadBalancerNode
 from amber.sim.kernel import Environment, ProcessGen, Timeout
 from amber.sim.nodes import Node
-from amber.sim.request import Request, Span
+from amber.sim.request import Request
 from amber.sim.rng import lognormal_from_percentiles, stream
 
 
@@ -29,7 +29,7 @@ class LoadBalancer(Node):
     def handle(self, req: Request) -> ProcessGen:
         overhead_ms = self._rng.lognormvariate(*self._overhead)
         yield Timeout(self.env, overhead_ms)
-        req.spans.append(Span(self.id, 0.0, overhead_ms))
+        self.record(req, 0.0, overhead_ms)
 
         target = self._pick()
         self.in_flight[target] += 1

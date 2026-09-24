@@ -3,7 +3,7 @@
 from amber.contracts import CacheNode
 from amber.sim.kernel import Environment, ProcessGen, Timeout
 from amber.sim.nodes import Node
-from amber.sim.request import Request, Span
+from amber.sim.request import Request
 from amber.sim.rng import lognormal_from_percentiles, stream
 
 
@@ -23,7 +23,7 @@ class Cache(Node):
     def handle(self, req: Request) -> ProcessGen:
         latency_ms = self._work_rng.lognormvariate(*self._latency)
         yield Timeout(self.env, latency_ms)
-        req.spans.append(Span(self.id, 0.0, latency_ms))
+        self.record(req, 0.0, latency_ms)
         if self._hit_rng.random() < self._hit_rate:
             return
         yield from self.downstream[0].handle(req)

@@ -3,7 +3,7 @@
 from amber.contracts import ServiceNode
 from amber.sim.kernel import Environment, ProcessGen, Resource, Timeout
 from amber.sim.nodes import Node
-from amber.sim.request import Request, Span
+from amber.sim.request import Request
 from amber.sim.rng import lognormal_from_percentiles, stream
 
 
@@ -20,6 +20,7 @@ class Service(Node):
         super().__init__(env, node.id)
         p = node.params
         self.replicas = [Resource(env, p.concurrency_per_replica, p.queue_limit) for _ in range(p.replicas)]
+        self.resources = self.replicas
         self._work = lognormal_from_percentiles(p.work.p50_ms, p.work.p99_ms)
         self._rng = stream(seed, node.id, "work")
         self._next = 0  # round-robin cursor over replicas
@@ -31,6 +32,7 @@ class Service(Node):
         grant = replica.request()
         if grant is None:  # the replica's line is full: 503
             req.status = "rejected"
+            self.rejects += 1
             return
         queued_at = self.env.now
         yield grant  # outside the try: a slot is released only once it has been granted
@@ -38,7 +40,7 @@ class Service(Node):
             queue_ms = self.env.now - queued_at
             work_ms = self._rng.lognormvariate(*self._work)
             yield Timeout(self.env, work_ms)
-            req.spans.append(Span(self.id, queue_ms, work_ms))
+            self.record(req, queue_ms, work_ms)
             for target in self.downstream:
                 yield from target.handle(req)
                 if req.failed:  # skip the remaining calls; the finally still frees the slot

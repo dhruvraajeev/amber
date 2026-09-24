@@ -4,7 +4,7 @@ from amber.contracts import HostedLlmParams, LlmNode
 from amber.sim.graph import presets
 from amber.sim.kernel import Environment, ProcessGen, Timeout
 from amber.sim.nodes import Node
-from amber.sim.request import Request, Span
+from amber.sim.request import Request
 from amber.sim.rng import lognormal_from_p50_p1, lognormal_from_percentiles, stream
 
 BACKOFF_BASE_MS = 500
@@ -21,7 +21,8 @@ class HostedLlm(Node):
     A call that finds it empty gets a 429, backs off and retries up to `maxRetries` times, then the
     request fails as `rate_limited`. The span's `queue_ms` is that backoff time; `work_ms` is the call.
 
-    `usd` is what completed calls cost; `rate_limit_hits` counts 429s, retried or not (Step 15 reads both).
+    `usd` is what completed calls cost. `rejects` counts 429s, retried or not: for this node a reject is
+    a rate-limit hit, and Step 15's rate-limit rule reads it that way.
     """
 
     def __init__(self, env: Environment, node: LlmNode, seed: int) -> None:
@@ -43,7 +44,6 @@ class HostedLlm(Node):
         self._tokens_rng = stream(seed, node.id, "tokens")
         self._retry_rng = stream(seed, node.id, "retry")
         self.usd = 0.0
-        self.rate_limit_hits = 0
 
     def handle(self, req: Request) -> ProcessGen:
         """Called straight from a service: the preset's default prompt and output sizes (§8.5)."""
@@ -54,7 +54,7 @@ class HostedLlm(Node):
         started_at = self.env.now
         attempt = 0
         while not self._take_permit():
-            self.rate_limit_hits += 1
+            self.rejects += 1
             if attempt == self._max_retries:
                 req.status = "rate_limited"
                 return
@@ -69,7 +69,7 @@ class HostedLlm(Node):
         generate_ms = output_tokens / self._tokens_rng.lognormvariate(*self._tps) * 1000
         yield Timeout(self.env, generate_ms)
 
-        req.spans.append(Span(self.id, backoff_ms, ttft_ms + generate_ms))
+        self.record(req, backoff_ms, ttft_ms + generate_ms)
         usd_in, usd_out = self._usd_per_token
         self.usd += prompt_tokens * usd_in + output_tokens * usd_out
 

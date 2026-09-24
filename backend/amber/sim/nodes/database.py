@@ -3,7 +3,7 @@
 from amber.contracts import DatabaseNode
 from amber.sim.kernel import Environment, ProcessGen, Resource, Timeout
 from amber.sim.nodes import Node
-from amber.sim.request import Request, Span
+from amber.sim.request import Request
 from amber.sim.rng import lognormal_from_percentiles, stream
 
 
@@ -16,6 +16,7 @@ class Database(Node):
         super().__init__(env, node.id)
         p = node.params
         self.pool = Resource(env, p.connection_pool, p.queue_limit)
+        self.resources = [self.pool]
         self._query = lognormal_from_percentiles(p.query.p50_ms, p.query.p99_ms)
         self._rng = stream(seed, node.id, "work")
 
@@ -23,6 +24,7 @@ class Database(Node):
         grant = self.pool.request()
         if grant is None:  # pool busy and the line is full
             req.status = "rejected"
+            self.rejects += 1
             return
         queued_at = self.env.now
         yield grant  # outside the try: a connection is released only once it has been granted
@@ -30,6 +32,6 @@ class Database(Node):
             queue_ms = self.env.now - queued_at
             query_ms = self._rng.lognormvariate(*self._query)
             yield Timeout(self.env, query_ms)
-            req.spans.append(Span(self.id, queue_ms, query_ms))
+            self.record(req, queue_ms, query_ms)
         finally:
             self.pool.release()

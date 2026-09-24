@@ -45,7 +45,7 @@ def test_a_call_is_ttft_then_generation_and_costs_its_llm_tokens():
     assert trail(req) == [("llm", 0.0, 4400.0)]  # 400 ttft + 256 tokens at 64/s
     assert req.first_token_at == pytest.approx(400.0)
     assert node.usd == pytest.approx(usd(1))
-    assert node.rate_limit_hits == 0
+    assert node.rejects == 0
 
 
 def test_only_the_first_call_sets_first_token_and_explicit_sizes_are_billed():
@@ -83,7 +83,7 @@ def test_a_burst_over_the_limit_is_rate_limited_and_never_billed():
     assert statuses(reqs) == ["ok", "ok", "rate_limited", "rate_limited", "rate_limited"]
     assert [len(r.spans) for r in reqs] == [1, 1, 0, 0, 0]  # a refused call leaves no span
     assert node.usd == pytest.approx(usd(2))
-    assert node.rate_limit_hits == 3
+    assert node.rejects == 3
 
 
 def test_the_bucket_refills_over_time_but_never_past_its_capacity():
@@ -119,7 +119,7 @@ def test_a_throttled_call_retries_until_a_permit_frees_up():
     assert statuses(reqs) == ["ok", "ok", "ok"]
     backoff_ms = reqs[2].spans[0].queue_ms
     assert 31_500 <= backoff_ms < 31_500 + 7 * 500
-    assert node.rate_limit_hits == 7
+    assert node.rejects == 7
     assert reqs[2].end == pytest.approx(backoff_ms + 4400.0)
     assert node.usd == pytest.approx(usd(3))
 
@@ -130,7 +130,7 @@ def test_running_out_of_retries_fails_the_request_after_the_backoff():
     reqs = send(env, node, 3)
     assert reqs[2].status == "rate_limited"
     assert 3_500 <= reqs[2].end < 3_500 + 3 * 500  # 500 + 1000 + 2000, each plus jitter
-    assert node.rate_limit_hits == 4  # the first try and three retries
+    assert node.rejects == 4  # the first try and three retries
     assert reqs[2].first_token_at is None
 
 

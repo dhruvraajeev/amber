@@ -147,6 +147,7 @@ class Resource:
 
     `busy_slot_ms` is the integral of busy slots over time, so utilization over a window is
     `(busy_slot_ms at end - busy_slot_ms at start) / (capacity * window_ms)` (§8.8).
+    `pop_queue_peak()` gives the longest the line got in a window, for the same per-second metrics.
     """
 
     def __init__(self, env: Environment, capacity: int, queue_limit: int) -> None:
@@ -159,6 +160,7 @@ class Resource:
         self._waiting: deque[Event] = deque()
         self._integral = 0.0  # busy slot-ms up to _since
         self._since = 0.0
+        self._queue_peak = 0
 
     @property
     def queue_len(self) -> int:
@@ -178,6 +180,7 @@ class Resource:
             return None
         grant = Event(self.env)
         self._waiting.append(grant)
+        self._queue_peak = max(self._queue_peak, len(self._waiting))
         return grant
 
     def release(self) -> None:
@@ -188,6 +191,11 @@ class Resource:
             self._waiting.popleft().succeed()  # the slot changes hands; busy stays the same
         else:
             self._set_busy(self.busy - 1)
+
+    def pop_queue_peak(self) -> int:
+        """The longest the line has been since the last call; the next window starts from its length now."""
+        peak, self._queue_peak = self._queue_peak, len(self._waiting)
+        return peak
 
     def _set_busy(self, busy: int) -> None:
         self._integral = self.busy_slot_ms
