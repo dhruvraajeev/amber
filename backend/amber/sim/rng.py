@@ -12,7 +12,8 @@ import hashlib
 import math
 import random
 
-PURPOSES = frozenset({"arrivals", "work", "hit", "tokens", "accept"})
+# §8.2's five, plus "retry" for hosted-LLM backoff jitter, so a 429 never shifts a latency sample.
+PURPOSES = frozenset({"arrivals", "work", "hit", "tokens", "accept", "retry"})
 
 # z-score of the 99th percentile of the standard normal: P(Z <= 2.3263479) = 0.99.
 Z99 = 2.3263479

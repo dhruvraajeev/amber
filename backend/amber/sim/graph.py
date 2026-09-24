@@ -274,13 +274,14 @@ def _unknown_presets(node: dict) -> list[tuple[str, str]]:
         for (mode, field), file in PRESET_FIELDS.items()
         if params.get("mode") == mode
         and isinstance(params.get(field), str)
-        and params[field] not in _ids(file)
+        and params[field] not in presets(file)
     ]
 
 
 @cache
-def _ids(preset_file: str) -> frozenset[str]:
-    return frozenset(p["id"] for p in json.loads((PRESETS / f"{preset_file}.json").read_text()))
+def presets(preset_file: str) -> dict[str, dict]:
+    """One shared/presets file as {id: preset}, read once. Nodes read their defaults from here."""
+    return {p["id"]: p for p in json.loads((PRESETS / f"{preset_file}.json").read_text())}
 
 
 def _parsed_traffic(users_node: dict) -> TrafficProfile | None:

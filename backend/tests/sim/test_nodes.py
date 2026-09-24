@@ -105,13 +105,18 @@ class Stub(Node):
 
 def send(env, entry, n, gap_ms=0.0, run_until=1e7):
     """`n` requests into `entry`, `gap_ms` apart from t=0, finished the way the users node finishes them."""
+    return send_at(env, entry, [i * gap_ms for i in range(n)], run_until)
+
+
+def send_at(env, entry, at_ms, run_until=1e7):
+    """One request into `entry` at each time in `at_ms`; same-time requests start in list order."""
 
     def journey(req):
         yield Timeout(env, req.created_at)
         yield from entry.handle(req)
         req.finish(env.now)
 
-    reqs = [Request(f"r{i}", i * gap_ms, math.inf) for i in range(n)]
+    reqs = [Request(f"r{i}", t, math.inf) for i, t in enumerate(at_ms)]
     for req in reqs:
         Process(env, journey(req))
     env.run(until=run_until)
