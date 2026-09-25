@@ -1,3 +1,4 @@
+import gpus from '@shared/presets/gpus.json'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { hasCapacity, loadColor, loadGlow } from '../../lib/color'
 import { level, pct, rps } from '../../lib/format'
@@ -75,7 +76,10 @@ function keyLine(d: NodeData): string {
       return `${d.params.preset} · pool ${d.params.connectionPool}`
     case 'agent':
       return `~${d.params.llmCallsMean} LLM calls`
-    case 'llm':
-      return d.params.mode === 'hosted' ? d.params.presetId : `${d.params.replicas} × ${d.params.gpuPresetId}`
+    case 'llm': {
+      const p = d.params
+      if (p.mode === 'hosted') return p.presetId
+      return `${p.replicas} × ${gpus.find((g) => g.id === p.gpuPresetId)?.name ?? p.gpuPresetId}`
+    }
   }
 }

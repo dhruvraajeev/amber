@@ -5,6 +5,7 @@ import gpus from '@shared/presets/gpus.json'
 import hostedLlms from '@shared/presets/hosted_llms.json'
 import models from '@shared/presets/models.json'
 import type { Design, DesignEdge, DesignNode, LatencyDist, RunConfig, TrafficProfile, ValidationIssue } from '../api/api'
+import { kvBudget } from './ai'
 import { estimateDesignRequests } from './estimate'
 
 export const LIMITS = { nodes: 50, edges: 100, minDurationS: 10, maxDurationS: 600, rps: 5000, requests: 200_000 }
@@ -163,15 +164,11 @@ const known = (path: string, id: string, list: { id: string }[]): Problem[] =>
   list.some((p) => p.id === id) ? [] : [[path, `unknown preset "${id}".`]]
 
 // A self-hosted model needs its weights to leave room for the KV cache (§8.7; backend: kv_capacity_bytes).
-const GPU_MEMORY_UTILIZATION = 0.9
-
 function modelFits(gpuId: string, modelId: string): Problem[] {
-  const gpu = gpus.find((g) => g.id === gpuId)
-  const model = models.find((m) => m.id === modelId)
-  if (!gpu || !model) return [] // an unknown id is its own issue
-  const usable = gpu.memoryGb * GPU_MEMORY_UTILIZATION
-  return usable > model.weightsGb ? [] : [['gpuPresetId',
-    `the model does not fit on this GPU (${model.weightsGb} GB of weights, ${Number(usable.toFixed(2))} GB usable on the ${gpu.name}).`]]
+  const kv = kvBudget(gpuId, modelId)
+  if (!kv) return [] // an unknown id is its own issue
+  return kv.capacityBytes > 0 ? [] : [['gpuPresetId',
+    `the model does not fit on this GPU (${kv.weightsGb} GB of weights, ${Number(kv.usableGb.toFixed(2))} GB usable on the ${kv.gpuName}).`]]
 }
 
 // Admission sets aside KV for the prompt plus the output reserve (§8.7) and nothing grows it later, so the

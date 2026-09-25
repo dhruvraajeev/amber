@@ -2,8 +2,14 @@ import gpus from '@shared/presets/gpus.json'
 import hostedLlms from '@shared/presets/hosted_llms.json'
 import models from '@shared/presets/models.json'
 import { LLM_DEFAULTS } from '../../canvas/map'
+import { kvBudget } from '../../lib/ai'
+import { count } from '../../lib/format'
 import type { HostedLlmParams, LlmParams, SelfHostedLlmParams } from '../../api/api'
-import { DistField, NumberField, SelectField, TextField, ToggleField, type FormProps } from '../fields'
+import { DistField, NumberField, Readout, SelectField, SliderField, ToggleField, type FormProps } from '../fields'
+
+// ponytail: the backend's one timing profile (sim/nodes/llm_selfhosted.py PROFILES). Step 27 measures real
+// ones into shared/profiles/, and this list should then be read from there.
+const PROFILES = [{ value: 'default', label: 'Default (uncalibrated)' }]
 
 // The form swaps entirely on `mode`: hosted APIs and self-hosted GPUs share no fields.
 export default function LlmForm({ params: p, set, err }: FormProps<LlmParams>) {
@@ -73,12 +79,15 @@ function SelfHosted({ params: p, set, err }: FormProps<SelfHostedLlmParams>) {
   const num = (key: 'replicas' | 'maxBatchSize' | 'maxBatchTokens' | 'maxOutputTokensReserve', label: string, help: string, unit?: string) => (
     <NumberField label={label} unit={unit} help={help} value={p[key]} onChange={(v) => set({ ...p, [key]: v })} error={err(key)} step={1} />
   )
-  const spec = (key: 'draftTokens' | 'acceptanceRate' | 'draftStepMs', label: string, help: string, unit?: string) => (
+  const spec = (key: 'draftTokens' | 'draftStepMs', label: string, help: string, unit?: string) => (
     <NumberField
-      label={label} unit={unit} help={help} value={s[key]} step={key === 'acceptanceRate' ? 0.05 : undefined}
+      label={label} unit={unit} help={help} value={s[key]}
       onChange={(v) => set({ ...p, speculative: { ...s, [key]: v } })} error={err(`speculative.${key}`)}
     />
   )
+  const kv = kvBudget(p.gpuPresetId, p.modelPresetId)
+  // An unknown profile (say, from an imported design) stays visible so the backend's error makes sense.
+  const profiles = PROFILES.some((o) => o.value === p.profileId) ? PROFILES : [...PROFILES, { value: p.profileId, label: p.profileId }]
   return (
     <>
       <SelectField
@@ -91,9 +100,17 @@ function SelfHosted({ params: p, set, err }: FormProps<SelfHostedLlmParams>) {
         options={models.map((m) => ({ value: m.id, label: m.name }))} error={err('modelPresetId')}
         onChange={(modelPresetId) => set({ ...p, modelPresetId })}
       />
-      <TextField
-        label="Timing profile" help="Which measured prefill/decode timing to use; 'default' until calibration (Part 2)."
-        value={p.profileId} onChange={(profileId) => set({ ...p, profileId })} error={err('profileId')}
+      {kv && kv.capacityBytes > 0 && (
+        <Readout>
+          {(kv.capacityBytes / 1e9).toFixed(1)} GB of the {kv.gpuName} is left for the KV cache after the weights: room for{' '}
+          {count(Math.floor(kv.capacityBytes / kv.bytesPerToken))} tokens at {count(kv.bytesPerToken / 1024)} KiB each. Each call
+          holds its prompt plus the output reserve until it finishes.
+        </Readout>
+      )}
+      <SelectField
+        label="Timing profile" help="Measured prefill and decode speed. Only an uncalibrated default exists until Part 2 measures real hardware."
+        value={p.profileId} options={profiles} error={err('profileId')}
+        onChange={(profileId) => set({ ...p, profileId })}
       />
       {num('replicas', 'Replicas', 'How many GPUs serve this model, each with its own batch.')}
       {num('maxBatchSize', 'Max batch size', 'Most sequences one GPU generates at the same time.')}
@@ -106,7 +123,11 @@ function SelfHosted({ params: p, set, err }: FormProps<SelfHostedLlmParams>) {
       {s.enabled && (
         <>
           {spec('draftTokens', 'Draft tokens', 'Tokens the draft model guesses per step.')}
-          {spec('acceptanceRate', 'Acceptance rate', 'Chance each guessed token is accepted (0–1).')}
+          <SliderField
+            label="Acceptance rate" help="Chance the big model accepts each guessed token."
+            value={s.acceptanceRate} onChange={(acceptanceRate) => set({ ...p, speculative: { ...s, acceptanceRate } })}
+            error={err('speculative.acceptanceRate')}
+          />
           {spec('draftStepMs', 'Draft step', 'Time the draft model takes per guessed token.', 'ms')}
         </>
       )}

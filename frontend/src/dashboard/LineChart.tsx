@@ -5,13 +5,15 @@ export interface Series { label: string; color: string; values: number[] }
 // A small time-series chart shared by the latency and GPU tabs. The SVG stretches to fill its box
 // (lines keep a 2px stroke via non-scaling-stroke); axis labels and the hover readout are HTML so
 // text never stretches. One y-axis only: callers split different units into separate charts.
-// Hover or focus + ←/→ moves a crosshair that reads out every series at that time.
-export default function LineChart({ xs, series, format, max, summary }: {
+// Hover or focus + ←/→ moves a crosshair that reads out every series at that time. `markAt` draws
+// playback's moment (the one the canvas shows) as a thin orange line.
+export default function LineChart({ xs, series, format, max, summary, markAt }: {
   xs: number[] // seconds, evenly spaced
   series: Series[]
   format: (v: number) => string
   max?: number // fixed y-axis top (e.g. 1 for a share); otherwise rounded up from the data
   summary: string // the one-line text version of the chart (§11.3 accessibility)
+  markAt?: number // seconds
 }) {
   const [at, setAt] = useState<number | null>(null)
   const gid = useId().replace(/[^a-zA-Z0-9]/g, '') // usable inside url(#…)
@@ -20,6 +22,8 @@ export default function LineChart({ xs, series, format, max, summary }: {
   const x = (i: number) => (last > 0 ? (i / last) * 1000 : 500)
   const y = (v: number) => 100 - (Math.min(v, top) / top) * 100
   const path = (vs: number[]) => vs.map((v, i) => `${i ? 'L' : 'M'}${x(i)},${y(v)}`).join('')
+  const span = xs[last] - xs[0]
+  const mark = markAt === undefined ? null : span > 0 ? Math.max(0, Math.min(1, (markAt - xs[0]) / span)) * 100 : 50
 
   const onMove = (e: PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect()
@@ -78,6 +82,7 @@ export default function LineChart({ xs, series, format, max, summary }: {
               />
             ))}
           </svg>
+          {mark !== null && <div className="pointer-events-none absolute inset-y-0 w-px bg-accent/70" style={{ left: `${mark}%` }} aria-hidden />}
           {at !== null && (
             <>
               <div className="pointer-events-none absolute inset-y-0 w-px bg-[linear-gradient(transparent,var(--muted),transparent)]" style={{ left: `${x(at) / 10}%` }} />

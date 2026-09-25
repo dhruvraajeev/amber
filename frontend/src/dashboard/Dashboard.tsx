@@ -28,15 +28,18 @@ const MIN_HEIGHT = 140
 // The results drawer (§11.2): tabs over the latest RunResult. Drag or arrow-key the top edge to resize.
 // While a new run is in flight (or was refused) the previous result stays up, dimmed, so the layout doesn't jump.
 export default function Dashboard() {
-  const { status, result, issues, open, height, tab, setDrawer, setTab, select, design, pinned, pin } = useStore(
+  const { status, result, issues, open, height, tab, setDrawer, setTab, select, design, pinned, pin, playhead, playing } = useStore(
     useShallow((s) => ({
       status: s.status, result: s.result, issues: s.issues, open: s.drawerOpen, height: s.drawerHeight,
       tab: s.tab, setDrawer: s.setDrawer, setTab: s.setTab, select: s.select, design: s.design, pinned: s.pinned, pin: s.pin,
+      playhead: s.playhead, playing: s.playing,
     })),
   )
   const isPinned = !!result && pinned.includes(result)
   // Results name nodes by id; show the current label, or the id if the node has since been deleted.
   const label = (id: string) => design?.nodes.find((n) => n.id === id)?.label ?? id
+  // Charts mark the moment the canvas is replaying, once playback has been used.
+  const markAt = playing || playhead > 0 ? result?.timeline[playhead]?.t : undefined
   const resize = (h: number) => setDrawer({ height: Math.round(Math.max(MIN_HEIGHT, Math.min(window.innerHeight * 0.6, h))) })
 
   const onDragStart = (e: PointerEvent) => {
@@ -116,7 +119,7 @@ export default function Dashboard() {
           {status === 'error' && <RunError issues={issues} />}
           {result && (
             <div className={`transition-opacity duration-200 ${status === 'done' ? '' : 'opacity-50'}`} aria-busy={status === 'running'}>
-              {body(tab, result, label, select)}
+              {body(tab, result, label, select, markAt)}
             </div>
           )}
           {!result && status !== 'error' && (
@@ -134,12 +137,12 @@ export default function Dashboard() {
   )
 }
 
-function body(tab: DashboardTab, result: RunResult, label: (id: string) => string, select: (id: string) => void) {
+function body(tab: DashboardTab, result: RunResult, label: (id: string) => string, select: (id: string) => void, markAt?: number) {
   switch (tab) {
     case 'summary': return <Summary result={result} />
-    case 'latency': return <LatencyChart result={result} />
+    case 'latency': return <LatencyChart result={result} markAt={markAt} />
     case 'load': return <LoadBars result={result} label={label} />
-    case 'gpu': return <GpuChart result={result} label={label} />
+    case 'gpu': return <GpuChart result={result} label={label} markAt={markAt} />
     case 'cost': return <CostCard result={result} label={label} />
     case 'bottlenecks': return <Bottlenecks result={result} onSelect={select} />
     case 'attribution': return <Attribution result={result} label={label} />

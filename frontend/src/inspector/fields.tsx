@@ -121,3 +121,8 @@ export function DistField(p: { label: string; help: string; value: LatencyDist; 
     </Row>
   )
 }
+
+/** A read-only line the form works out from the fields above it, e.g. the KV cache a GPU has left. */
+export function Readout({ children }: { children: ReactNode }) {
+  return <p className="num rounded-lg border border-border bg-panel-2/60 px-3 py-2 text-[11px] leading-relaxed text-muted">{children}</p>
+}

@@ -118,11 +118,16 @@ def test_a_hosted_llm_reject_is_a_rate_limit_hit_and_a_warning():
     ]
 
 
-def test_a_self_hosted_llm_reject_is_not_called_a_rate_limit():
-    """Its rejects are calls too big for the GPU's KV cache: the plain reject rule, never the 429 one."""
+def test_a_self_hosted_llm_reject_is_a_call_too_big_for_its_kv_cache():
+    """Not a rate-limit hit, and not "raise queueLimit" either: an LLM has no queueLimit."""
     gpu = GpuSeries(node_id="gpu", points=[GpuPoint(t=1, kv_pct=0.1, batch=1, waiting=0)])
     assert run([node("gpu", kind="llm", rejects=4)], gpu=[gpu]) == [
-        ("critical", "gpu", "Llama on L4 rejected 4 requests (0.4%). Raise queueLimit or add capacity.")
+        (
+            "critical",
+            "gpu",
+            "Llama on L4 turned away 4 requests (0.4%) too big for its KV cache. "
+            "Use a bigger GPU or a smaller output reserve.",
+        )
     ]
 
 

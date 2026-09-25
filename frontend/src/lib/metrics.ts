@@ -16,6 +16,7 @@ export const METRICS: Metric[] = [
   { name: 'Latency p95', get: (r) => r.summary.latencyMs.p95, format: ms, better: 'lower' },
   { name: 'Latency p99', get: (r) => r.summary.latencyMs.p99, format: ms, better: 'lower' },
   { name: 'Time to first token p50', get: (r) => r.summary.ttftMs?.p50, format: ms, better: 'lower' },
+  { name: 'Time to first token p99', get: (r) => r.summary.ttftMs?.p99, format: ms, better: 'lower' },
   { name: 'Throughput', get: (r) => r.summary.throughputRps, format: rps, better: 'higher' },
   { name: 'Error rate', get: (r) => r.summary.errorRate, format: (v) => pct(v, 1), formatDelta: (v) => `${(v * 100).toFixed(1)} pts`, better: 'lower' },
   { name: 'Monthly cost', get: (r) => r.cost.monthlyTotalUsd, format: usd, better: 'lower' },

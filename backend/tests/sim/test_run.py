@@ -114,6 +114,54 @@ def test_every_reserved_byte_of_kv_is_freed_once_the_traffic_drains():
     assert all(r.end is not None for r in run.metrics.requests)
 
 
+# ── The AI templates, tuned (Step 23) ────────────────────────────────────────
+
+UI_RUN = config(duration_s=60, seed=42)  # what Run does before the user touches the run bar
+
+
+def problems(result) -> list[str]:
+    """The node ids of every warn or critical finding."""
+    return [b.node_id for b in result.bottlenecks if b.severity != "info"]
+
+
+def with_params(name: str, node_id: str, **params) -> Design:
+    raw = template(name)
+    next(n for n in raw["nodes"] if n["id"] == node_id)["params"].update(params)
+    return Design.model_validate(raw)
+
+
+def test_the_rag_template_opens_on_a_chat_api_too_small_to_wait_on_its_llm():
+    """Each request holds a Chat API worker for its whole ~3 s LLM call, so 2 × 10 workers fill up
+    at 5 req/s long before the LLM does. Enough workers clear it, and the first token comes sooner."""
+    tuned = simulate(design("rag-chatbot-hosted"), UI_RUN)
+    roomy = simulate(with_params("rag-chatbot-hosted", "n_api", concurrencyPerReplica=50), UI_RUN)
+
+    assert problems(tuned) == ["n_api"]
+    assert problems(roomy) == []
+    assert tuned.summary.ttft_ms.p50 > 2 * roomy.summary.ttft_ms.p50  # the wait for a worker comes first
+
+
+def test_the_agent_templates_spike_fills_the_kv_cache_and_a_waiting_line_together():
+    """The spike is the problem: the same GPU copes with the base traffic alone (answering in seconds,
+    not half a minute), and a second replica copes with the spike."""
+    tuned = simulate(design("agent-self-hosted"), UI_RUN)
+    base_rps = template("agent-self-hosted")["nodes"][0]["params"]["traffic"]["baseRps"]
+    calm = simulate(
+        with_params("agent-self-hosted", "n_users", traffic={"type": "constant", "rps": base_rps}), UI_RUN
+    )
+    [series] = tuned.gpu
+    before = [p for p in series.points if p.t <= 15]  # the spike starts at 15 s
+    busiest = max(series.points, key=lambda p: p.waiting)
+
+    assert set(problems(tuned)) == {"n_llm"}
+    assert problems(calm) == []
+    # ~18 tokens/s for one sequence on the L4: short answers keep a request well inside the 60 s run.
+    assert calm.summary.latency_ms.p50 < 15_000
+    assert max(p.kv_pct for p in before) < 0.5 and all(p.waiting == 0 for p in before)
+    assert busiest.t > 15 and busiest.waiting > 0 and busiest.kv_pct >= 0.95  # a line forms once KV is full
+    assert problems(simulate(with_params("agent-self-hosted", "n_llm", replicas=2), UI_RUN)) == []
+
+
 # ── The result (§7.4) ────────────────────────────────────────────────────────
 
 

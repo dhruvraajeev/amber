@@ -9,16 +9,26 @@ from amber.sim.request import Request
 
 MAX_FINDINGS = 5
 SEVERITIES = ("critical", "warn", "info")  # most severe first
-# §8.9's table, row by row: (severity, message). A finding ranks by its severity, then by its row.
-RULES = (
-    ("critical", "{name} is at {util}% capacity. Requests queue for up to {queue} waiting."),
-    ("critical", "{name}'s queue keeps growing. The system can't keep up at this traffic."),
-    ("critical", "{name} rejected {n} requests ({pct}%). Raise queueLimit or add capacity."),
-    ("warn", "{name} hit its rate limit {n} times. Add retries/backoff or a higher tier."),
-    ("critical", "{name} GPU memory is full {pct}% of the time. Requests wait for KV cache space."),
-    ("info", "{share}% of slow-request time is spent {doing} {name}."),
-    ("warn", "{name} is at {util}%. There's little headroom for spikes."),
-)
+# §8.9's table, row by row: name -> (severity, message). A finding ranks by its severity, then by its row.
+# "kv_rejects" is §8.9's reject row worded for a self-hosted LLM, which has no queueLimit.
+RULES = {
+    "capacity": ("critical", "{name} is at {util}% capacity. Requests queue for up to {queue} waiting."),
+    "queue_growing": ("critical", "{name}'s queue keeps growing. The system can't keep up at this traffic."),
+    "rejects": ("critical", "{name} rejected {n} requests ({pct}%). Raise queueLimit or add capacity."),
+    "kv_rejects": (
+        "critical",
+        "{name} turned away {n} requests ({pct}%) too big for its KV cache. "
+        "Use a bigger GPU or a smaller output reserve.",
+    ),
+    "rate_limit": ("warn", "{name} hit its rate limit {n} times. Add retries/backoff or a higher tier."),
+    "kv_full": (
+        "critical",
+        "{name} GPU memory is full {pct}% of the time. Requests wait for KV cache space.",
+    ),
+    "attribution": ("info", "{share}% of slow-request time is spent {doing} {name}."),
+    "headroom": ("warn", "{name} is at {util}%. There's little headroom for spikes."),
+}
+ROW = {name: row for row, name in enumerate(RULES)}
 
 
 def attribution(answered: Iterable[Request], p99: float) -> list[AttributionRow]:
@@ -62,38 +72,42 @@ def bottlenecks(
     once per node, and the 70% headroom warning stays quiet when the 90% capacity rule already fired.
     """
     found: list[tuple[int, Bottleneck]] = []  # (row in RULES, finding)
-    gpu_ids = {series.node_id for series in gpu}  # self-hosted LLMs, whose rejects are calls too big for KV
+    gpu_ids = {series.node_id for series in gpu}  # the self-hosted LLMs
 
-    def add(rule: int, node_id: str, **values: object) -> None:
+    def add(rule: str, node_id: str, **values: object) -> None:
         severity, message = RULES[rule]
         finding = Bottleneck(
             severity=severity, node_id=node_id, message=message.format(name=labels[node_id], **values)
         )
-        found.append((rule, finding))
+        found.append((ROW[rule], finding))
 
     for n in nodes:
         if n.util_avg >= 0.9:
-            add(0, n.id, util=_pct(n.util_avg), queue=round(n.queue_max))
+            add("capacity", n.id, util=_pct(n.util_avg), queue=round(n.queue_max))
         elif n.util_avg >= 0.7:
-            add(6, n.id, util=_pct(n.util_avg))
+            add("headroom", n.id, util=_pct(n.util_avg))
         if _queue_growing([p.nodes[n.id].queue for p in timeline]):
-            add(1, n.id)
-        if n.rejects and n.kind == "llm" and n.id not in gpu_ids:  # a hosted LLM's rejects are 429s
-            add(3, n.id, n=n.rejects)
-        elif n.rejects:
-            add(2, n.id, n=n.rejects, pct=f"{100 * n.rejects / max(1, summary.requests):.1f}")
+            add("queue_growing", n.id)
+        if n.rejects:
+            pct = f"{100 * n.rejects / max(1, summary.requests):.1f}"
+            if n.id in gpu_ids:  # a self-hosted LLM's rejects are calls too big for its KV cache
+                add("kv_rejects", n.id, n=n.rejects, pct=pct)
+            elif n.kind == "llm":  # a hosted LLM's rejects are 429s
+                add("rate_limit", n.id, n=n.rejects)
+            else:
+                add("rejects", n.id, n=n.rejects, pct=pct)
 
     for series in gpu:
         full = sum(p.kv_pct >= 0.95 for p in series.points) / max(1, len(series.points))
         if full > 0.2:
-            add(4, series.node_id, pct=_pct(full))
+            add("kv_full", series.node_id, pct=_pct(full))
 
     if rows and rows[0].queue_share + rows[0].work_share >= 0.5:
         top = rows[0]
         if top.queue_share >= top.work_share:
-            add(5, top.node_id, share=_pct(top.queue_share), doing="waiting in")
+            add("attribution", top.node_id, share=_pct(top.queue_share), doing="waiting in")
         else:
-            add(5, top.node_id, share=_pct(top.work_share), doing="working in")
+            add("attribution", top.node_id, share=_pct(top.work_share), doing="working in")
 
     if not found:
         p99 = round(summary.latency_ms.p99)
