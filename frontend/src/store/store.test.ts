@@ -17,9 +17,18 @@ const fresh = async () => {
 beforeEach(() => saved.clear())
 
 describe('design slice', () => {
+  it('opens on the landing page even with an autosaved design, and loading one enters the editor', async () => {
+    const first = await fresh()
+    first.getState().loadDesign(classic as Design) // autosaved
+    expect(first.getState().home).toBe(false)
+    const reloaded = await fresh()
+    expect(reloaded.getState().design?.name).toBe(classic.name) // kept, for "Continue"
+    expect(reloaded.getState().home).toBe(true)
+  })
+
   it('adds, connects with agent roles, and removes nodes with their edges', async () => {
     const s = await fresh()
-    s.getState().loadTemplate(BLANK)
+    s.getState().loadDesign(BLANK)
     const add = (kind: 'agent' | 'llm' | 'service') => {
       s.getState().addNode(kind, { x: 0, y: 0 })
       return s.getState().selectedId!
@@ -38,7 +47,7 @@ describe('design slice', () => {
 
   it('edits nodes without touching the template it came from', async () => {
     const s = await fresh()
-    s.getState().loadTemplate(classic as Design)
+    s.getState().loadDesign(classic as Design)
     s.getState().updateNode('n_api', { label: 'Edge API' })
     s.getState().moveNode('n_api', { x: 1, y: 2 })
     const api = s.getState().design!.nodes.find((n) => n.id === 'n_api')!
@@ -48,7 +57,7 @@ describe('design slice', () => {
 
   it('autosaves and restores the design on the next load', async () => {
     const s = await fresh()
-    s.getState().loadTemplate(agent as Design)
+    s.getState().loadDesign(agent as Design)
     s.getState().setName('Mine')
     const again = await fresh()
     expect(again.getState().design).toEqual({ ...agent, name: 'Mine' })
@@ -59,7 +68,7 @@ describe('design slice', () => {
     vi.stubGlobal('localStorage', { getItem: boom, setItem: boom })
     const s = await fresh()
     expect(s.getState().design).toBeNull()
-    s.getState().loadTemplate(classic as Design)
+    s.getState().loadDesign(classic as Design)
     expect(s.getState().design!.name).toBe(classic.name)
     vi.stubGlobal('localStorage', { getItem: (k: string) => saved.get(k) ?? null, setItem: (k: string, v: string) => saved.set(k, v) })
   })
@@ -68,7 +77,7 @@ describe('design slice', () => {
 describe('run slice', () => {
   it('refuses an invalid design with its issues', async () => {
     const s = await fresh()
-    s.getState().loadTemplate(BLANK)
+    s.getState().loadDesign(BLANK)
     await s.getState().run({ durationS: 60, seed: 1, warmupS: 5 })
     expect(s.getState().status).toBe('error')
     expect(s.getState().issues.map((i) => i.code)).toContain('NO_USERS')
@@ -79,7 +88,7 @@ describe('run slice', () => {
     const { ApiError, simulate } = await import('../api/api')
     const issue = { code: 'PARAM_RANGE', message: 'Unknown preset.', nodeId: 'n_llm' }
     vi.mocked(simulate).mockRejectedValueOnce(new ApiError([issue]))
-    s.getState().loadTemplate(classic as Design)
+    s.getState().loadDesign(classic as Design)
     await s.getState().run({ durationS: 60, seed: 1, warmupS: 5 })
     expect(s.getState()).toMatchObject({ status: 'error', issues: [issue] })
   })
@@ -87,7 +96,7 @@ describe('run slice', () => {
   it('runs once even if asked twice, then pins at most two results', async () => {
     const s = await fresh()
     const { simulate } = await import('../api/api')
-    s.getState().loadTemplate(classic as Design)
+    s.getState().loadDesign(classic as Design)
     const config = { durationS: 60, seed: 1, warmupS: 5 }
     await Promise.all([s.getState().run(config), s.getState().run(config)])
     expect(simulate).toHaveBeenCalledTimes(1)
@@ -116,10 +125,10 @@ describe('run slice', () => {
 
   it('drops the last result when another design is loaded, but keeps pins', async () => {
     const s = await fresh()
-    s.getState().loadTemplate(classic as Design)
+    s.getState().loadDesign(classic as Design)
     await s.getState().run({ durationS: 60, seed: 1, warmupS: 5 })
     s.getState().pin()
-    s.getState().loadTemplate(agent as Design)
+    s.getState().loadDesign(agent as Design)
     expect(s.getState()).toMatchObject({ status: 'idle', result: null, playhead: 0 })
     expect(s.getState().pinned).toHaveLength(1)
   })

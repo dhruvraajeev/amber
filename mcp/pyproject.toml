@@ -1,6 +1,6 @@
 [project]
 name = "amber-mcp"
-version = "0.1.0"
+version = "1.0.0"
 description = "MCP server for Amber: lets AI agents list templates, validate designs, and run simulations."
 requires-python = ">=3.12"
 dependencies = [

@@ -13,11 +13,6 @@ export type LlmParams = LlmNode['params']
 
 export const simulate = (design: Design, config: RunConfig) => call<RunResult>('simulate', { design, config })
 
-export const validate = (design: Design, config?: RunConfig) =>
-  call<{ issues: ValidationIssue[] }>('validate', { design, config }).then((body) => body.issues)
-
-export const getPresets = () => call<Record<string, unknown[]>>('presets')
-
 export const getTemplates = () => call<Design[]>('templates')
 
 /** A refused request, as issues the run drawer can list: a 422's own, or the `{error, detail}` of a 429, 504, … */

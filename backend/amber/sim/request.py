@@ -10,8 +10,8 @@ Status = Literal["ok", "timeout", "rejected", "rate_limited"]
 class Span(NamedTuple):
     """Time one request spent at one node: waiting for a slot, then doing that node's own work.
 
-    `work_ms` excludes downstream calls, which leave spans of their own. Step 15 sums these per node to
-    find where slow requests spend their time.
+    `work_ms` excludes downstream calls, which leave spans of their own. `sim/analysis.py` sums these
+    per node to find where slow requests spend their time.
     """
 
     node_id: str
@@ -32,7 +32,7 @@ class Request:
     created_at: float  # ms
     deadline: float  # ms: created_at + the users node's clientTimeoutMs
     status: Status | None = None
-    first_token_at: float | None = None  # ms; set by the first LLM call (Step 14)
+    first_token_at: float | None = None  # ms; set by the first LLM call
     end: float | None = None  # ms
     spans: list[Span] = field(default_factory=list)
 

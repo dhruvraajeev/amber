@@ -114,7 +114,7 @@ def test_every_reserved_byte_of_kv_is_freed_once_the_traffic_drains():
     assert all(r.end is not None for r in run.metrics.requests)
 
 
-# ── The AI templates, tuned (Step 23) ────────────────────────────────────────
+# ── The AI templates, tuned ───────────────────────────────────────────────────
 
 UI_RUN = config(duration_s=60, seed=42)  # what Run does before the user touches the run bar
 

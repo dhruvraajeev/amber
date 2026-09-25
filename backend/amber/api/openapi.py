@@ -1,4 +1,4 @@
-"""Print the API's OpenAPI schema, which the frontend's types are generated from (plan §7, Step 18).
+"""Print the API's OpenAPI schema, which the frontend's types are generated from (plan §7).
 
     uv run python -m amber.api.openapi > openapi.json
 

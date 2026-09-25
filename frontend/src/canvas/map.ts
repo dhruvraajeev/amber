@@ -85,3 +85,31 @@ export function newNode(kind: NodeKind, position: { x: number; y: number }, take
   const label = KINDS.find((k) => k.kind === kind)!.name
   return { id, kind, label, position, params: structuredClone(DEFAULTS[kind]) } as DesignNode
 }
+
+// ── Layout for designs that arrive without one ──────────────────────────────
+
+// A design from an AI agent (via Amber's MCP link) or a hand-written file has no real positions: every
+// node sits at 0,0. Lay those out left to right by call depth, so the canvas reads like the templates.
+// A design whose nodes are already spread out is returned untouched.
+export function withLayout(design: Design): Design {
+  const spots = new Set(design.nodes.map((n) => (n.position ? `${n.position.x},${n.position.y}` : '')))
+  if (design.nodes.length < 2 || (spots.size === design.nodes.length && !spots.has(''))) return design
+  // Depth = the longest chain of edges leading to a node. Capped at one pass per node, so a (still
+  // invalid) cycle ends instead of looping.
+  const depth = new Map(design.nodes.map((n) => [n.id, 0]))
+  for (let pass = 0; pass < design.nodes.length; pass++) {
+    for (const e of design.edges) {
+      const d = (depth.get(e.source) ?? 0) + 1
+      if (depth.has(e.target) && d > depth.get(e.target)!) depth.set(e.target, d)
+    }
+  }
+  const columns = new Map<number, number>() // depth → nodes placed in it so far
+  const count = (d: number) => design.nodes.filter((n) => depth.get(n.id) === d).length
+  const nodes = design.nodes.map((n) => {
+    const d = depth.get(n.id)!
+    const row = columns.get(d) ?? 0
+    columns.set(d, row + 1)
+    return { ...n, position: { x: d * 240, y: 150 + (row - (count(d) - 1) / 2) * 180 } }
+  })
+  return { ...design, nodes }
+}

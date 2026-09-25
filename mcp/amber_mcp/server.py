@@ -1,12 +1,16 @@
 """Amber's MCP server (plan §13): lets an AI agent list templates, check a design, and run it.
 
 Every tool is a thin wrapper over Amber's public REST API; nothing here simulates. `AMBER_API_URL` picks
-the API (default: the live deploy). Run with `amber-mcp`, which speaks MCP over stdio.
+the API (default: the live deploy), which also serves the editor that `open_url` links to. The
+`model_codebase` prompt walks an agent through turning the repo it is working in into a design.
+Run with `amber-mcp`, which speaks MCP over stdio.
 """
 
+import base64
 import json
 import logging
 import os
+import zlib
 
 import httpx
 from mcp.server.mcpserver import MCPServer
@@ -37,6 +41,8 @@ Kinds and params:
   outputTokensPerCall. Exactly 1 edge with role "llm" to an llm node; any number with role "tool".
 - llm (leaf), hosted: mode "hosted", presetId, ttft, tokensPerSecond {"p50","p99Low"}, inputUsdPer1M,
   outputUsdPer1M, rateLimitRpm, maxRetries.
+  Token sizes are not llm params: a call from an agent uses the agent's basePromptTokens and
+  outputTokensPerCall; a call from anything else uses the preset's defaultPromptTokens/defaultOutputTokens.
 - llm, self-hosted: mode "selfHosted", gpuPresetId, modelPresetId, profileId ("default"), replicas,
   maxBatchSize, maxBatchTokens, maxOutputTokensReserve,
   speculative {"enabled","draftTokens","acceptanceRate","draftStepMs"}.
@@ -45,6 +51,13 @@ Kinds and params:
   maxBatchSize/maxBatchTokens, or enable speculative decoding.
 Users traffic and agent params describe the workload: to meet a target, change capacity (replicas, pools,
 batch sizes, cache hitRate) and keep the workload as asked unless told otherwise.
+Modeling tips:
+- One design can have several users nodes. For a traffic mix (e.g. 80% reads, 20% writes), give each
+  endpoint its own users node with its share of the rps and its own service node, and let both paths
+  share the database, cache or llm nodes downstream. Keep it one design, so shared nodes see all load.
+- To give one plain LLM call (no agent loop) its real prompt and output sizes, which drive hosted cost
+  and GPU memory, route it through an agent node with llmCallsMean 1, toolCallsPerStep 0,
+  contextGrowthTokensPerStep 0, and basePromptTokens/outputTokensPerCall set from the code.
 Preset ids come from get_presets; list_templates has complete examples to start from.
 The graph must be acyclic and every node reachable from a users node.
 Minimal example:
@@ -92,12 +105,53 @@ async def validate_design(design: dict | str) -> dict:
 @server.tool(
     description="Runs a design for duration_s simulated seconds (10-600). Returns the summary (latency "
     "percentiles, throughput, and errorRate, which counts errors, timeouts and rejections), the bottlenecks "
-    "found, and the monthly cost. The same design and seed always give the same result.\n" + DESIGN_GUIDE
+    "found, the monthly cost, and open_url: a link that opens this design in Amber's editor, laid out on the "
+    "canvas, where the user can run it and watch it. Give the user the open_url of the design you settle on. "
+    "The same design and seed always give the same result.\n" + DESIGN_GUIDE
 )
 async def simulate(design: dict | str, duration_s: float = 60, seed: int = 42) -> dict:
-    body = {"design": _design(design), "config": {"durationS": duration_s, "seed": seed}}
+    design = _design(design)
+    body = {"design": design, "config": {"durationS": duration_s, "seed": seed}}
     result = await _call("POST", "/api/simulate", body)
-    return {key: result[key] for key in ("summary", "bottlenecks", "cost")}  # never the timeline: too big
+    trimmed = {key: result[key] for key in ("summary", "bottlenecks", "cost")}  # never the timeline: too big
+    return {**trimmed, "open_url": open_url(design)}
+
+
+@server.prompt(
+    title="Model my codebase in Amber",
+    description="Read the current codebase, turn its architecture into an Amber design, and test it against "
+    "a traffic, latency, and cost target.",
+)
+def model_codebase(target: str = "the traffic it expects, with p99 under 500 ms") -> str:
+    return f"""Model this codebase's architecture in Amber and check whether it meets: {target}.
+
+1. Read the code, not just the README: entry points and routes, outbound HTTP clients, database and cache
+   clients, queues, LLM SDK calls (OpenAI, Anthropic, Groq, ...), agent or tool loops, and deploy config
+   (Dockerfile, compose, k8s, Terraform) for replica counts, pool sizes, and timeouts.
+2. Map each runtime component to an Amber node: a web server or worker is a service (replicas and worker
+   concurrency from the deploy config), Postgres/MySQL/Mongo is a database (connectionPool from the
+   client's pool size), Redis/Memcached in front of a lookup is a cache, a call to a hosted model API is an
+   llm in "hosted" mode (pick the closest presetId from get_presets), and a loop of LLM calls with tools is
+   an agent with a role "llm" edge to that llm. A single LLM call goes through an agent node too (1 call,
+   0 tools), so its prompt and output token sizes match what the code sends (e.g. max_tokens). Each
+   endpoint with its own path gets its own users node (its share of the traffic) and service node, in
+   one design. Edges follow who calls whom.
+3. Where the code can't tell you a number (work latency, cache hit rate, calls per agent run), pick a
+   sensible value, and list every such assumption for the user.
+4. Start from the closest list_templates design, validate_design until it is clean, then simulate.
+5. Report p50/p99, error rate, monthly cost, and the bottlenecks, each tied back to the file or setting
+   it comes from. If the target is missed, change capacity (replicas, pools, cache, batch sizes), simulate
+   again, and say which change in the codebase or deploy config each fix corresponds to.
+6. End with the open_url of the final design so the user can see it in Amber's editor."""
+
+
+def open_url(design: object) -> str:
+    """A link to Amber's editor with the design in its #d= fragment (raw deflate, then base64url).
+    frontend/src/lib/designFile.ts reads this format; keep the two in step. A fragment never reaches the
+    server, so the design stays between the agent, the user, and their browser."""
+    packer = zlib.compressobj(9, zlib.DEFLATED, -15)  # -15: raw deflate, no zlib header
+    packed = packer.compress(json.dumps(design, separators=(",", ":")).encode()) + packer.flush()
+    return f"{API_URL}/#d={base64.urlsafe_b64encode(packed).decode().rstrip('=')}"
 
 
 async def _call(method: str, path: str, body: dict | None = None) -> object:

@@ -25,12 +25,12 @@ class HostedLlm(Node):
     request fails as `rate_limited`. The span's `queue_ms` is that backoff time; `work_ms` is the call.
 
     `usd` is what completed calls cost. `rejects` counts 429s, retried or not: for this node a reject is
-    a rate-limit hit, and Step 15's rate-limit rule reads it that way.
+    a rate-limit hit, and the rate-limit rule in `sim/analysis.py` reads it that way.
     """
 
     def __init__(self, env: Environment, node: LlmNode, seed: int) -> None:
         super().__init__(env, node.id)
-        p: HostedLlmParams = node.params  # Step 16 builds this class only for mode "hosted"
+        p: HostedLlmParams = node.params  # `sim/run.py` builds this class only for mode "hosted"
         preset = presets("hosted_llms")[p.preset_id]
         self.default_tokens = (preset["defaultPromptTokens"], preset["defaultOutputTokens"])
         self._ttft = lognormal_from_percentiles(p.ttft.p50_ms, p.ttft.p99_ms)

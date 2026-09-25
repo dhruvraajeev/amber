@@ -32,7 +32,7 @@ class TimingProfile:
     prefill_ms_per_token: float  # b_p
     decode_base_ms: float  # a_d
     decode_ms_per_sequence: float  # b_d
-    verify_cost_per_draft_token: float = 0.1  # c_v, §8.7's default until Step 27 calibrates it
+    verify_cost_per_draft_token: float = 0.1  # c_v, §8.7's default until calibration (v1.1) measures it
 
     def prefill_ms(self, tokens: int) -> float:
         """`a_p + b_p · tokens`: one prefill pass over this many prompt tokens."""
@@ -47,7 +47,7 @@ class TimingProfile:
         return 1 + self.verify_cost_per_draft_token * draft_tokens
 
 
-# ponytail: one uncalibrated profile until Step 27 measures real ones into shared/profiles/.
+# ponytail: one uncalibrated profile until calibration (v1.1) measures real ones into shared/profiles/.
 # Rough shape of Llama 3.1 8B FP16 on an L4 (the agent-self-hosted template): ~5k prompt tokens/s of
 # prefill; ~20 tokens/s for one sequence, since each step reads all 16 GB of weights at ~300 GB/s.
 PROFILES = {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, simulate, validate } from './api'
+import { ApiError, simulate } from './api'
 
 // Answers every fetch with `status` and `body` (a string is sent as is, anything else as JSON).
 const answer = (status: number, body: unknown) =>
@@ -18,11 +18,6 @@ describe('api', () => {
     const [url, init] = vi.mocked(fetch).mock.calls[0]
     expect(url).toBe('/api/simulate')
     expect(JSON.parse(init!.body as string)).toEqual({ design, config })
-  })
-
-  it('unwraps validate’s issues', async () => {
-    answer(200, { issues: [{ code: 'NO_USERS', message: 'm' }] })
-    expect(await validate(design)).toEqual([{ code: 'NO_USERS', message: 'm' }])
   })
 
   it('throws a 422’s issues as they are', async () => {

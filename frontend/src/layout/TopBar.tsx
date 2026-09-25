@@ -80,7 +80,7 @@ function Mark() {
   )
 }
 
-// Plan §8.11, in plain words. docs/simulation-model.md (Step 16) carries the same list.
+// Plan §8.11, in plain words. docs/simulation-model.md carries the same list.
 const ASSUMPTIONS = [
   'Users keep arriving at the set rate no matter how slow the system gets (open-loop traffic).',
   'Calls are synchronous: a caller waits for everything downstream to finish.',

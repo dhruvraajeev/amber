@@ -7,10 +7,10 @@ from amber.sim.request import Request, Span
 class Node:
     """What every node shares: the clock, its id, the nodes it calls, and the counters metrics read.
 
-    `downstream` is filled in after every node exists (Step 16 wires it from `design.edges`), since a
+    `downstream` is filled in after every node exists (`sim/run.py` wires it from `design.edges`), since a
     node can't be handed targets that haven't been built yet.
 
-    Metrics (Step 15) sample three things from every node, once per simulated second: `resources`
+    Metrics (`sim/metrics.py`) sample three things from every node, once per simulated second: `resources`
     (the slot pools behind utilization and queue length: kernel `Resource`s, or anything with the same
     `capacity`, `busy_slot_ms` and `pop_queue_peak()`, like a GPU replica; empty for kinds with no
     capacity limit),

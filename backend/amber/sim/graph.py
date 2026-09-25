@@ -27,7 +27,7 @@ PRESET_FIELDS = {
     ("selfHosted", "gpuPresetId"): lambda: presets("gpus"),
     ("selfHosted", "modelPresetId"): lambda: presets("models"),
     # ponytail: backend only; validate.ts checks profileId is non-empty, because the one profile lives
-    # in Python until Step 27 writes shared/profiles/. The UI still shows this 422 on the node.
+    # in Python until calibration (v1.1) writes shared/profiles/. The UI still shows this 422 on the node.
     ("selfHosted", "profileId"): lambda: PROFILES,
 }
 

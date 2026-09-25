@@ -32,3 +32,6 @@ result.json
 *.gguf
 calibration/models/
 calibration/raw/
+
+# Local tool state (Serena, editors)
+.serena/

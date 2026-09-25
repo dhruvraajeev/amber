@@ -1,4 +1,4 @@
-// Graph rules (plan §7.6) and limits (§3). The backend mirrors this in sim/graph.py (Step 12),
+// Graph rules (plan §7.6) and limits (§3). The backend mirrors this in sim/graph.py,
 // and both are tested against the same fixtures in shared/fixtures/graph/, so keep them in step.
 
 import gpus from '@shared/presets/gpus.json'

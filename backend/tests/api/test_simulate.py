@@ -24,14 +24,14 @@ def without_wall_fields(result: dict) -> dict:
 
 
 def test_healthz(client):
-    assert client.get("/healthz").json() == {"status": "ok", "version": "0.1.0", "sha": "dev"}
+    assert client.get("/healthz").json() == {"status": "ok", "version": "1.0.0", "sha": "dev"}
 
 
 def test_presets_are_the_shared_files_under_the_frontends_names(client):
     body = client.get("/api/presets").json()
     assert body.keys() == {"gpus", "models", "hostedLlms", "databases", "services", "profiles"}
     assert body["hostedLlms"] == json.loads((SHARED / "presets" / "hosted_llms.json").read_text())
-    assert body["profiles"] == []  # calibration profiles arrive in Part 2
+    assert body["profiles"] == []  # calibration profiles arrive in v1.1
 
 
 def test_templates_come_back_exactly_as_the_files_have_them(client, templates):

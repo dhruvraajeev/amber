@@ -1,4 +1,4 @@
-"""The built UI served from the API's own origin (Step 19)."""
+"""The built UI served from the API's own origin."""
 
 import pytest
 from fastapi.testclient import TestClient

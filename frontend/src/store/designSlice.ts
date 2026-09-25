@@ -1,5 +1,6 @@
 import type { StateCreator } from 'zustand'
 import { newNode, type NodeData } from '../canvas/map'
+import { isDesign } from '../lib/designFile'
 import { load } from '../lib/storage'
 import type { Design, DesignNode, NodeKind } from '../api/api'
 import type { Store } from '.'
@@ -11,8 +12,9 @@ export const AUTOSAVE_KEY = 'amber.design'
 export interface DesignSlice {
   design: Design | null
   selectedId: string | null
-  loads: number // bumped by loadTemplate so the canvas remounts and re-fits the view
-  loadTemplate: (design: Design) => void
+  loads: number // bumped by loadDesign so the canvas remounts and re-fits the view
+  // Opens a design (a template, a blank canvas, a file, or an `#d=` link) in place of the current one.
+  loadDesign: (design: Design) => void
   setName: (name: string) => void
   addNode: (kind: NodeKind, position: { x: number; y: number }) => void
   updateNode: (id: string, patch: Partial<NodeData>) => void
@@ -37,7 +39,7 @@ export const designSlice: StateCreator<Store, [], [], DesignSlice> = (set, get) 
     loads: 0,
 
     // A new design starts with no result: the last run belongs to the old one (pins are kept for Compare).
-    loadTemplate: (design) =>
+    loadDesign: (design) =>
       set((s) => ({
         design: structuredClone(design), selectedId: null, loads: s.loads + 1, home: false,
         status: 'idle', result: null, issues: [], playhead: 0, playing: false,
@@ -79,6 +81,6 @@ export const designSlice: StateCreator<Store, [], [], DesignSlice> = (set, get) 
 
 // The autosaved design, if it still looks like one. Anything else (old format, hand-edited) is dropped.
 function restore(): Design | null {
-  const d = load(AUTOSAVE_KEY) as Design | null
-  return d?.version === 1 && Array.isArray(d.nodes) && Array.isArray(d.edges) ? d : null
+  const d = load(AUTOSAVE_KEY)
+  return isDesign(d) ? d : null
 }

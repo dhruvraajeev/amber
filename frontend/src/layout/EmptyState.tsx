@@ -1,13 +1,17 @@
-import { ArrowRight, ArrowUpRight, Plus } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, FileUp, Plus } from 'lucide-react'
 import { BLANK, KINDS } from '../canvas/map'
+import { parseDesign } from '../lib/designFile'
 import type { Design } from '../api/api'
 import Embers from './Embers'
 
 // Empty state (§11.3): three template cards and "Blank canvas", under an ember orb, over drifting embers.
 // Each card draws its template's real graph, so you can see the shape before you pick it.
 // `resume` names the design left open in the editor, if any, so it can be picked up again.
-export default function EmptyState({ templates, offline, resume, onPick, onResume }: {
-  templates: Design[]; offline: boolean; resume?: string; onPick: (d: Design) => void; onResume: () => void
+// "Open file" loads a design saved with Export (or written by hand, or by an agent); `notice` says why one
+// couldn't be opened, from here or from an `#d=` link.
+export default function EmptyState({ templates, offline, resume, notice, onPick, onResume, onNotice }: {
+  templates: Design[]; offline: boolean; resume?: string; notice: string
+  onPick: (d: Design) => void; onResume: () => void; onNotice: (notice: string) => void
 }) {
   return (
     <div className="panel h-full overflow-hidden bg-bg">
@@ -57,7 +61,29 @@ export default function EmptyState({ templates, offline, resume, onPick, onResum
               <Plus size={15} aria-hidden />
               Blank canvas
             </button>
+            <label className="field flex h-10 cursor-pointer items-center gap-2 rounded-full px-4 text-[13px] text-muted focus-within:border-accent hover:text-text">
+              <FileUp size={15} aria-hidden />
+              Open file
+              <input
+                type="file"
+                accept=".json,application/json"
+                className="sr-only"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = '' // picking the same file again still fires
+                  if (!file) return
+                  const d = parseDesign(await file.text())
+                  if (d) onPick(d)
+                  else onNotice(`${file.name} isn’t an Amber design (JSON with "version": 1, "nodes" and "edges").`)
+                }}
+              />
+            </label>
           </div>
+          {notice && (
+            <p role="alert" className="mt-4 max-w-md text-center text-[13px] text-muted">
+              {notice}
+            </p>
+          )}
         </div>
       </div>
     </div>

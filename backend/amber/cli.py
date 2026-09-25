@@ -1,4 +1,4 @@
-"""Run a design from the command line, without the frontend or the API (plan §18, Step 16).
+"""Run a design from the command line, without the frontend or the API (plan §18).
 
     uv run python -m amber.cli ../shared/templates/classic-web-app.json --duration 60 --seed 1
 

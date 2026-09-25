@@ -1,4 +1,4 @@
-"""The schema that frontend/src/api/generated.ts is generated from (Step 18)."""
+"""The schema that frontend/src/api/generated.ts is generated from."""
 
 import json
 

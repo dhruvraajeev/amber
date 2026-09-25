@@ -7,7 +7,7 @@ import { count } from '../../lib/format'
 import type { HostedLlmParams, LlmParams, SelfHostedLlmParams } from '../../api/api'
 import { DistField, NumberField, Readout, SelectField, SliderField, ToggleField, type FormProps } from '../fields'
 
-// ponytail: the backend's one timing profile (sim/nodes/llm_selfhosted.py PROFILES). Step 27 measures real
+// ponytail: the backend's one timing profile (sim/nodes/llm_selfhosted.py PROFILES). Calibration (v1.1) measures real
 // ones into shared/profiles/, and this list should then be read from there.
 const PROFILES = [{ value: 'default', label: 'Default (uncalibrated)' }]
 
@@ -108,7 +108,7 @@ function SelfHosted({ params: p, set, err }: FormProps<SelfHostedLlmParams>) {
         </Readout>
       )}
       <SelectField
-        label="Timing profile" help="Measured prefill and decode speed. Only an uncalibrated default exists until Part 2 measures real hardware."
+        label="Timing profile" help="Measured prefill and decode speed. Only an uncalibrated default exists until calibration (v1.1) measures real hardware."
         value={p.profileId} options={profiles} error={err('profileId')}
         onChange={(profileId) => set({ ...p, profileId })}
       />

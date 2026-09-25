@@ -74,7 +74,8 @@ def test_prefill_and_decode_are_linear_in_their_size():
 
 
 def test_the_default_profile_is_the_one_the_template_names():
-    # shared/templates/agent-self-hosted.json uses profileId "default"; nothing else exists until Step 27.
+    # shared/templates/agent-self-hosted.json uses profileId "default"; nothing else exists until
+    # calibration (v1.1).
     default = PROFILES["default"]
     assert default.prefill_ms(512) == pytest.approx(15 + 0.2 * 512)  # 117.4 ms
     assert default.decode_step_ms(1) == pytest.approx(50.5)  # ~20 tokens/s for one sequence

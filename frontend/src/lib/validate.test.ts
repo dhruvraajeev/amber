@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Design, RunConfig } from '../api/api'
 import { RULE_CODES, validate } from './validate'
 
-// Each fixture lists the exact set of codes it must produce. The backend (Step 12) runs the same files.
+// Each fixture lists the exact set of codes it must produce. The backend's tests run the same files.
 interface Fixture { description: string; expect: string[]; config: RunConfig; design: Design }
 const fixtures = import.meta.glob<Fixture>('@shared/fixtures/graph/*.json', { eager: true, import: 'default' })
 const templates = import.meta.glob<Design>('@shared/templates/*.json', { eager: true, import: 'default' })

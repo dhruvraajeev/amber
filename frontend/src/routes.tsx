@@ -3,8 +3,7 @@ import App from './App'
 import CompareView from './compare/CompareView'
 import Placeholder from './layout/Placeholder'
 
-// Plan §11.1. /d/:designId and /sweep/:sweepId arrive with Part 3 (Steps 30, 32).
-// Share becomes SharedRunPage in Step 30.
+// Plan §11.1. Saved designs (/d/:designId) and working share links arrive with v1.2.
 export const router = createBrowserRouter([
   { path: '/', element: <App /> },
   { path: '/compare', element: <CompareView /> },
