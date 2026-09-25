@@ -479,6 +479,64 @@ input[type="range"]::-moz-range-thumb {
   filter: drop-shadow(0 0 3px currentColor);
 }
 
+/* A node added from the palette flares in: a burst of ember light behind it while the card brightens out
+   of a blur and settles. A deleted node burns out quickly (Canvas.tsx holds the delete for EXIT_MS). The
+   burst is the node wrapper's ::before (::after is the invalid badge), behind the card. */
+.react-flow__node.ember-in > div {
+  animation: ember-card-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.react-flow__node.ember-out > div {
+  animation: ember-card-out 180ms ease-in forwards;
+}
+.react-flow__node.ember-in::before,
+.react-flow__node.ember-out::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -22px;
+  border-radius: 40%;
+  background: radial-gradient(closest-side, rgb(255 160 100 / 0.6), rgb(224 52 47 / 0.28) 55%, transparent);
+  pointer-events: none;
+  animation: ember-burst 620ms ease-out both;
+}
+.react-flow__node.ember-out::before {
+  animation-duration: 180ms;
+}
+@keyframes ember-card-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+    filter: brightness(2.4) blur(3px);
+    box-shadow: 0 0 0 1px rgb(255 106 43 / 0.9), 0 0 40px 8px rgb(255 106 43 / 0.6);
+  }
+  40% {
+    opacity: 1;
+    filter: brightness(1.5) blur(0);
+    box-shadow: 0 0 0 1px rgb(255 106 43 / 0.7), 0 0 28px 4px rgb(255 106 43 / 0.4);
+  }
+}
+@keyframes ember-card-out {
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+    filter: brightness(2.2) blur(2px);
+    box-shadow: 0 0 0 1px rgb(255 106 43 / 0.9), 0 0 32px 6px rgb(255 106 43 / 0.6);
+  }
+}
+@keyframes ember-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
 /* Nodes and edges named by a validation issue (§7.5): red border plus a badge / dashes, so it's not hue alone. */
 .react-flow__node.invalid > div {
   border-color: var(--crit) !important; /* over the load color NodeCard sets inline */
@@ -551,8 +609,13 @@ input[type="range"]::-moz-range-thumb {
   }
   .orb::after,
   .pulse-dot,
-  .ember-icon > svg {
+  .ember-icon > svg,
+  .react-flow__node > div {
     animation: none;
+  }
+  .react-flow__node.ember-in::before,
+  .react-flow__node.ember-out::before {
+    display: none;
   }
   .ember-icon::before,
   .ember-icon::after {

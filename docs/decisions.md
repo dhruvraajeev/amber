@@ -157,3 +157,7 @@ Non-obvious choices, newest last. One entry: date — context → decision → w
   - **Palette icons:** the one editor addition kept. `.ember-icon` gives each glyph a glow, an opacity flicker, and two faint wisps. Each time a wisp fades out, `Palette.tsx` re-rolls its heading and lean on `animationiteration` (the CSS vars `--ax/--ay/--ar` and `--bx/--by/--br`), so the wisps drift at random angles instead of all rising straight up.
   - **Cost:** only opacity and transform animate, so it runs on the compositor.
   - **Reduced motion:** icons keep the glow; the flicker and wisps stop.
+- 2026-09-25 — Node effects (owner):
+  - **Adding:** a node added from the palette (click or drop) flares in over 620 ms. Behind it, the node wrapper's `::before` throws a burst of ember light while the card brightens out of a blur. Canvas tags the new id `ember-in` for 700 ms; `addNode` selects what it adds, which is how the id is found.
+  - **Deleting:** Delete/Backspace burns the node out in 180 ms. `onBeforeDelete` tags the nodes `ember-out` and waits `EXIT_MS` before React Flow removes them, and removal clears the tag so a reused id doesn't inherit it.
+  - **Reduced motion:** no animation, same timing.
