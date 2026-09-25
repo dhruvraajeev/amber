@@ -3,7 +3,8 @@
 #   docker run -p 8000:8000 amber        → http://localhost:8000
 
 # Stage 1: build the UI. Only frontend/dist leaves this stage; node is not in the final image.
-FROM node:24-slim AS frontend
+# The output is plain JS/CSS, so it builds once on the build machine's own platform, never emulated.
+FROM --platform=$BUILDPLATFORM node:24-slim AS frontend
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
