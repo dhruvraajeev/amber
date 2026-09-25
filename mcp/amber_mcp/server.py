@@ -40,6 +40,11 @@ Kinds and params:
 - llm, self-hosted: mode "selfHosted", gpuPresetId, modelPresetId, profileId ("default"), replicas,
   maxBatchSize, maxBatchTokens, maxOutputTokensReserve,
   speculative {"enabled","draftTokens","acceptanceRate","draftStepMs"}.
+  Speed comes from profileId alone (one uncalibrated profile for now); the GPU sets only memory (how many
+  requests fit in the KV cache at once) and price. So a faster GPU is not faster here: add replicas, raise
+  maxBatchSize/maxBatchTokens, or enable speculative decoding.
+Users traffic and agent params describe the workload: to meet a target, change capacity (replicas, pools,
+batch sizes, cache hitRate) and keep the workload as asked unless told otherwise.
 Preset ids come from get_presets; list_templates has complete examples to start from.
 The graph must be acyclic and every node reachable from a users node.
 Minimal example:
@@ -85,9 +90,9 @@ async def validate_design(design: dict | str) -> dict:
 
 
 @server.tool(
-    description="Runs a design for duration_s simulated seconds (10-600) and returns the summary (latency "
-    "percentiles, throughput, errors), the bottlenecks found, and the monthly cost. The same design and seed "
-    "always give the same result.\n" + DESIGN_GUIDE
+    description="Runs a design for duration_s simulated seconds (10-600). Returns the summary (latency "
+    "percentiles, throughput, and errorRate, which counts errors, timeouts and rejections), the bottlenecks "
+    "found, and the monthly cost. The same design and seed always give the same result.\n" + DESIGN_GUIDE
 )
 async def simulate(design: dict | str, duration_s: float = 60, seed: int = 42) -> dict:
     body = {"design": _design(design), "config": {"durationS": duration_s, "seed": seed}}
