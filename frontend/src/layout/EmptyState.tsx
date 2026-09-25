@@ -11,7 +11,7 @@ export default function EmptyState({ templates, offline, resume, onPick, onResum
 }) {
   return (
     <div className="panel h-full overflow-hidden">
-      <Embers className="pointer-events-none absolute inset-0 size-full opacity-80" />
+      <Embers className="pointer-events-none absolute inset-0 size-full opacity-60" />
       <div className="relative grid h-full place-items-center overflow-auto px-6 py-10">
         <div className="flex w-full max-w-4xl flex-col items-center">
           <div className="orb size-40 [view-transition-name:orb] sm:size-48" aria-hidden />

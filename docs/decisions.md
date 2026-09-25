@@ -151,3 +151,9 @@ Non-obvious choices, newest last. One entry: date — context → decision → w
   - **Why the wisps are drawn explicitly:** a wisp is 16 fading copies at the mote's earlier ages. Fading the canvas each frame instead left grey smudges, because low-alpha pixels never fully clear.
   - **Editor:** a class, `.editor`, darkens the panel tokens a step, adds ember light pooling in the corners, and puts a soft orange-red glow around every panel. The landing page and `/compare` are unchanged.
   - **Reduced motion:** gets one still frame.
+- 2026-09-25 — Look, second pass (owner):
+  - **Landing:** half the motes (≤36), dimmer.
+  - **Editor:** its look is reverted to 3c79f64. The `.editor` class and its darker panels and glow are gone.
+  - **Palette icons:** the one editor addition kept. `.ember-icon` gives each glyph a glow, an opacity flicker, and two faint wisps. Each time a wisp fades out, `Palette.tsx` re-rolls its heading and lean on `animationiteration` (the CSS vars `--ax/--ay/--ar` and `--bx/--by/--br`), so the wisps drift at random angles instead of all rising straight up.
+  - **Cost:** only opacity and transform animate, so it runs on the compositor.
+  - **Reduced motion:** icons keep the glow; the flicker and wisps stop.

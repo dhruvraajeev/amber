@@ -70,7 +70,7 @@ export default function Embers({ className = '' }: { className?: string }) {
       canvas.width = w * dpr
       canvas.height = h * dpr
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      motes = Array.from({ length: Math.min(70, Math.round((w * h) / 16000)) }, () => spawn(true))
+      motes = Array.from({ length: Math.min(36, Math.round((w * h) / 32000)) }, () => spawn(true))
       if (still) draw(0)
     }
 
