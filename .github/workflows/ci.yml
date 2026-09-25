@@ -43,6 +43,23 @@ jobs:
       # Timing-sensitive tests are left out: a shared runner can't hold a wall-clock bound.
       - run: uv run pytest -m "not slow"
 
+  # The MCP server's tests mock the API (respx), so they need no running backend.
+  mcp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: mcp/uv.lock
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
+
   # frontend/src/api/generated.ts must be what the backend's schema generates today: rename a Pydantic
   # field without running `npm run gen:types` and this fails.
   types:
