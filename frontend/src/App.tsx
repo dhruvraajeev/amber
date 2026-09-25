@@ -24,7 +24,7 @@ export default function App() {
   const { loadTemplate, setName, setHome } = useStore.getState()
 
   return (
-    <div className="grid h-full grid-cols-[4.5rem_minmax(0,1fr)_19rem] grid-rows-[auto_minmax(16rem,1fr)_auto_auto] gap-3 p-3">
+    <div className={`grid h-full grid-cols-[4.5rem_minmax(0,1fr)_19rem] grid-rows-[auto_minmax(16rem,1fr)_auto_auto] gap-3 p-3 ${editing ? 'editor' : ''}`}>
       <TopBar className="col-span-3">
         {editing && (
           <input

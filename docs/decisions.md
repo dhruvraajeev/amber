@@ -146,3 +146,8 @@ Non-obvious choices, newest last. One entry: date — context → decision → w
   - A 600 s classic-web-app run (119k requests, near the 200k cap) finished in 4.3 s of server time, well inside the 20 s wall limit, so 0.5 vCPU is enough.
   - `az resource list` shows only `amber-env` and `amber`, so no registry.
 - 2026-09-25 — Friendly URL: Azure picks the middle of the app's address (`victoriousrock-f5544b42`), and only the first label (`amber`) is ours to choose. Buying a domain is ruled out by §0.1. So https://dhruvraajeev.github.io/amber/ redirects to the Azure URL: `pages/index.html`, published by `.github/workflows/pages.yml`, also as `404.html` so that `/amber/<path>` keeps its path. Pages source is set to "GitHub Actions". The address bar ends on the Azure URL. If the Azure URL ever changes, update `TARGET` in `pages/index.html` (3 places). A free custom domain (`*.is-a.dev` plus a Container Apps managed certificate) would keep the name in the address bar; not done.
+- 2026-09-25 — Owner-requested look (outside the step plan):
+  - **Landing page:** a backdrop of faint ember motes drifting up (`layout/Embers.tsx`). It's a canvas with no library, in theme colors read from the CSS tokens, and each mote trails a short wisp.
+  - **Why the wisps are drawn explicitly:** a wisp is 16 fading copies at the mote's earlier ages. Fading the canvas each frame instead left grey smudges, because low-alpha pixels never fully clear.
+  - **Editor:** a class, `.editor`, darkens the panel tokens a step, adds ember light pooling in the corners, and puts a soft orange-red glow around every panel. The landing page and `/compare` are unchanged.
+  - **Reduced motion:** gets one still frame.
