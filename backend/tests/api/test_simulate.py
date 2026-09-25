@@ -1,6 +1,7 @@
 """The HTTP API (plan §9): what each endpoint answers, and the shape of every error."""
 
 import json
+from importlib.metadata import version
 
 from fastapi.testclient import TestClient
 
@@ -24,18 +25,17 @@ def without_wall_fields(result: dict) -> dict:
 
 
 def test_healthz(client):
-    assert client.get("/healthz").json() == {"status": "ok", "version": "1.0.0", "sha": "dev"}
+    assert client.get("/healthz").json() == {"status": "ok", "version": version("amber"), "sha": "dev"}
 
 
 def test_presets_are_the_shared_files_under_the_frontends_names(client):
     body = client.get("/api/presets").json()
-    assert body.keys() == {"gpus", "models", "hostedLlms", "databases", "services", "profiles"}
+    assert body.keys() == {"gpus", "models", "hostedLlms", "databases", "services"}
     assert body["hostedLlms"] == json.loads((SHARED / "presets" / "hosted_llms.json").read_text())
-    assert body["profiles"] == []  # calibration profiles arrive in v1.1
 
 
 def test_templates_come_back_exactly_as_the_files_have_them(client, templates):
-    # No `"id": null` or `"role": null` added: the frontend's design hash would see them.
+    # No `"id": null` or `"role": null` added: the design hash would see them.
     assert client.get("/api/templates").json() == [templates[k] for k in sorted(templates)]
 
 

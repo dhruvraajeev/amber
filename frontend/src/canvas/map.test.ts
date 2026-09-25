@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import template from '@shared/templates/agent-self-hosted.json'
 import type { Design } from '../api/api'
-import { canonicalDesign, designHash, KINDS, newNode, toFlowEdge, toFlowNode } from './map'
+import { KINDS, newNode, toFlowEdge, toFlowNode } from './map'
 
 const design = template as Design
 
@@ -24,32 +24,5 @@ describe('design → React Flow mapping', () => {
       expect(n.kind).toBe(kind)
       taken.add(n.id)
     }
-  })
-})
-
-describe('canonical design and hash (position excluded)', () => {
-  const moved: Design = { ...design, nodes: design.nodes.map((n) => ({ ...n, position: { x: n.position.x + 99, y: -3 } })) }
-
-  it('has no positions and sorted keys', () => {
-    const c = canonicalDesign(design)
-    expect(c).not.toContain('position')
-    expect(c.startsWith('{"edges":')).toBe(true)
-  })
-
-  it('moving nodes does not change the hash', async () => {
-    expect(await designHash(moved)).toBe(await designHash(design))
-    expect(await designHash(design)).toMatch(/^[0-9a-f]{64}$/)
-  })
-
-  it('changing anything else does change the hash', async () => {
-    const edited = structuredClone(design)
-    edited.nodes[0].label += ' (edited)'
-    expect(await designHash(edited)).not.toBe(await designHash(design))
-  })
-
-  it('key order in the input does not matter', () => {
-    expect(canonicalDesign({ version: 1, edges: design.edges, nodes: design.nodes, name: design.name })).toBe(
-      canonicalDesign(design),
-    )
   })
 })

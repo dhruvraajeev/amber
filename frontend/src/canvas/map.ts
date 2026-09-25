@@ -5,8 +5,7 @@ import type { Design, DesignEdge, DesignNode, LlmParams, NodeKind, NodeParamsByK
 
 export const BLANK: Design = { name: 'Untitled design', version: 1, nodes: [], edges: [] }
 
-// Translation between the §7 Design contract and React Flow's node/edge shapes,
-// plus the canonical form used for `designHash`.
+// Translation between the §7 Design contract and React Flow's node/edge shapes.
 
 // A DesignNode minus the fields React Flow already stores on its own node (id, position).
 type Body<N> = N extends DesignNode ? Omit<N, 'id' | 'position'> : never
@@ -17,27 +16,6 @@ export type FlowEdge = Edge<{ role?: DesignEdge['role'] }>
 // One way only: the store holds the Design, and the canvas renders it through this.
 export const toFlowNode = ({ id, position, ...data }: DesignNode): FlowNode => ({ id, position, type: data.kind, data: data as NodeData })
 export const toFlowEdge = ({ id, source, target, role }: DesignEdge): FlowEdge => ({ id, source, target, type: 'traffic', data: { role }, label: role })
-
-// Canonical JSON (§7.4): sorted keys, no positions, no undefined fields. Moving a node never changes it.
-// The backend must produce byte-identical output.
-export function canonicalDesign(design: Design): string {
-  return stableStringify({ ...design, nodes: design.nodes.map((n) => ({ ...n, position: undefined })) })
-}
-
-function stableStringify(v: unknown): string {
-  if (Array.isArray(v)) return `[${v.map(stableStringify).join(',')}]`
-  if (v !== null && typeof v === 'object') {
-    const o = v as Record<string, unknown>
-    const keys = Object.keys(o).filter((k) => o[k] !== undefined).sort()
-    return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(o[k])}`).join(',')}}`
-  }
-  return JSON.stringify(v)
-}
-
-export async function designHash(design: Design): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalDesign(design)))
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
 
 // ── Palette entries and defaults for newly dropped nodes ────────────────────
 

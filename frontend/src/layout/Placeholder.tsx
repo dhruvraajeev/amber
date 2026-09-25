@@ -2,7 +2,7 @@ import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router'
 import TopBar from './TopBar'
 
-// Stand-in page for routes whose real view comes in a later step.
+// A message and a way back to the editor: the 404 page.
 export default function Placeholder({ title, body }: { title: string; body: string }) {
   return (
     <div className="flex h-full flex-col gap-3 p-3">

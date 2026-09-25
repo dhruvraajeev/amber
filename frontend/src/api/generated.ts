@@ -34,7 +34,7 @@ export interface paths {
         };
         /**
          * Get Presets
-         * @description Every preset in shared/presets, plus the calibration profiles.
+         * @description Every preset in shared/presets.
          */
         get: operations["get_presets_api_presets_get"];
         put?: never;

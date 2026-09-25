@@ -48,8 +48,8 @@ async def test_list_templates_drops_positions(api):
 
 async def test_get_presets_drops_notes(api):
     gpu = {"id": "t4", "name": "T4", "usdPerHour": 0.53, "note": "source", "verifiedAt": "2026-09-24"}
-    api.get("/api/presets").respond(json={"gpus": [gpu], "profiles": []})
-    assert await get_presets() == {"gpus": [{"id": "t4", "name": "T4", "usdPerHour": 0.53}], "profiles": []}
+    api.get("/api/presets").respond(json={"gpus": [gpu]})
+    assert await get_presets() == {"gpus": [{"id": "t4", "name": "T4", "usdPerHour": 0.53}]}
 
 
 async def test_validate_fills_positions_and_accepts_a_string(api):

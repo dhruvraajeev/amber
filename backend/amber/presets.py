@@ -1,4 +1,4 @@
-"""The files in shared/ that the frontend and backend both read: presets, profiles and templates.
+"""The files in shared/ that the frontend and backend both read: presets and templates.
 
 shared/ sits at the repo root, next to backend/, and the Dockerfile copies it to the same place.
 Every file is read once and cached; they never change while the server runs.
@@ -30,10 +30,8 @@ def presets(preset_file: str) -> dict[str, dict]:
 
 @cache
 def all_presets() -> dict[str, list]:
-    """Every preset list, plus the calibration profiles (none until v1.1), for `GET /api/presets`."""
-    body = {key: list(presets(file).values()) for key, file in PRESET_FILES.items()}
-    body["profiles"] = [_read(path) for path in sorted((SHARED / "profiles").glob("*.json"))]
-    return body
+    """Every preset list, for `GET /api/presets`."""
+    return {key: list(presets(file).values()) for key, file in PRESET_FILES.items()}
 
 
 @cache

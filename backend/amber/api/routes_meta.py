@@ -20,7 +20,7 @@ async def healthz() -> dict[str, str]:
 
 @router.get("/api/presets")
 async def get_presets() -> dict[str, list]:
-    """Every preset in shared/presets, plus the calibration profiles."""
+    """Every preset in shared/presets."""
     return all_presets()
 
 
