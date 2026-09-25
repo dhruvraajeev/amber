@@ -78,7 +78,7 @@ def test_tokens_per_second_has_its_slow_tail_at_p99_low():
 
 def test_a_burst_over_the_limit_is_rate_limited_and_never_billed():
     env = Environment()
-    node = llm(env, rpm=2, retries=0)
+    node = llm(env, rpm=120, retries=0)  # starts with one second's worth: 2 permits
     reqs = send(env, node, 5)
     assert statuses(reqs) == ["ok", "ok", "rate_limited", "rate_limited", "rate_limited"]
     assert [len(r.spans) for r in reqs] == [1, 1, 0, 0, 0]  # a refused call leaves no span
@@ -86,14 +86,30 @@ def test_a_burst_over_the_limit_is_rate_limited_and_never_billed():
     assert node.rejects == 3
 
 
+@pytest.mark.parametrize(("rpm", "first_burst"), [(6000, 100), (120, 2), (60, 1), (2, 1)])
+def test_the_bucket_starts_with_one_seconds_worth_of_permits_and_never_less_than_one(rpm, first_burst):
+    env = Environment()
+    reqs = send(env, llm(env, rpm=rpm, retries=0), first_burst + 1)
+    assert statuses(reqs) == ["ok"] * first_burst + ["rate_limited"]
+
+
 def test_the_bucket_refills_over_time_but_never_past_its_capacity():
     # 60 rpm: one permit per second, 60 at most. Everything at one instant runs in creation order.
-    at_ms = [0.0] * 61 + [1000.0] * 2 + [600_000.0] * 61
+    at_ms = [0.0] * 2 + [1000.0] * 2 + [600_000.0] * 61
     env = Environment()
     reqs = send_at(env, llm(env, rpm=60, retries=0), at_ms)
     limited = [r.created_at for r in reqs if r.status == "rate_limited"]
-    # t=0: 60 permits, one call too many. t=1 s: one permit back. After 10 idle minutes: 60, not 600.
+    # t=0: one second's worth, 1 permit. t=1 s: one back. After 10 idle minutes: 60, not 600.
     assert limited == [0.0, 1000.0, 600_000.0]
+
+
+def test_a_short_run_over_the_limit_passes_the_limit_not_a_free_minute_on_top():
+    """The audit's case: 60 rpm, 2 calls a second for 60 s. A bucket that started full passed 90 calls
+    (60 saved up plus 30 refills while it lasted); the provider would pass one a second."""
+    env = Environment()
+    reqs = send(env, llm(env, rpm=60, retries=0), 120, gap_ms=500.0)
+    ok = [r.created_at for r in reqs if r.status == "ok"]
+    assert ok == [1000.0 * s for s in range(60)]  # one per whole second, as the limit says
 
 
 def test_backoff_doubles_from_500_ms_up_to_8_s_plus_jitter():
@@ -111,34 +127,35 @@ def test_jitter_varies_and_is_the_same_for_the_same_seed():
 
 
 def test_a_throttled_call_retries_until_a_permit_frees_up():
-    # 2 rpm: one permit every 30 s. The third call at t=0 waits 500+1000+2000+4000+8000+8000 ms
-    # (23.5 s, plus ≤3 s of jitter) and is still refused; the 7th retry, at ≥31.5 s, gets through.
+    # 2 rpm: it starts with 1 permit, then one every 30 s. The second call at t=0 waits
+    # 500+1000+2000+4000+8000+8000 ms (23.5 s, plus ≤3 s of jitter) and is still refused; the 7th
+    # retry, at ≥31.5 s, gets through.
     env = Environment()
     node = llm(env, rpm=2, retries=7)
-    reqs = send(env, node, 3)
-    assert statuses(reqs) == ["ok", "ok", "ok"]
-    backoff_ms = reqs[2].spans[0].queue_ms
+    reqs = send(env, node, 2)
+    assert statuses(reqs) == ["ok", "ok"]
+    backoff_ms = reqs[1].spans[0].queue_ms
     assert 31_500 <= backoff_ms < 31_500 + 7 * 500
     assert node.rejects == 7
-    assert reqs[2].end == pytest.approx(backoff_ms + 4400.0)
-    assert node.usd == pytest.approx(usd(3))
+    assert reqs[1].end == pytest.approx(backoff_ms + 4400.0)
+    assert node.usd == pytest.approx(usd(2))
 
 
 def test_running_out_of_retries_fails_the_request_after_the_backoff():
     env = Environment()
     node = llm(env, rpm=2, retries=3)
-    reqs = send(env, node, 3)
-    assert reqs[2].status == "rate_limited"
-    assert 3_500 <= reqs[2].end < 3_500 + 3 * 500  # 500 + 1000 + 2000, each plus jitter
+    reqs = send(env, node, 2)
+    assert reqs[1].status == "rate_limited"
+    assert 3_500 <= reqs[1].end < 3_500 + 3 * 500  # 500 + 1000 + 2000, each plus jitter
     assert node.rejects == 4  # the first try and three retries
-    assert reqs[2].first_token_at is None
+    assert reqs[1].first_token_at is None
 
 
 def test_retries_draw_jitter_from_their_own_stream_so_latencies_do_not_shift():
-    # Same seed, varied ttft: the third call's latency must not depend on whether it was throttled
+    # Same seed, varied ttft: the second call's latency must not depend on whether it was throttled
     # first, because its 7 jitter draws come from the "retry" stream, not the "work" one.
-    def third_call_work_ms(rpm):
+    def second_call_work_ms(rpm):
         env = Environment()
-        return send(env, llm(env, rpm=rpm, retries=7, ttft_ms=None), 3)[2].spans[0].work_ms
+        return send(env, llm(env, rpm=rpm, retries=7, ttft_ms=None), 2)[1].spans[0].work_ms
 
-    assert third_call_work_ms(rpm=2) == third_call_work_ms(rpm=3000)
+    assert second_call_work_ms(rpm=2) == second_call_work_ms(rpm=3000)

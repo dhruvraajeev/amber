@@ -6,6 +6,7 @@ from amber.sim.kernel import Environment, ProcessGen, Timeout
 from amber.sim.nodes import Node
 from amber.sim.request import Request
 from amber.sim.rng import lognormal_from_p50_p1, lognormal_from_percentiles, stream
+from amber.token_bucket import TokenBucket
 
 BACKOFF_BASE_MS = 500
 BACKOFF_CAP_MS = 8000
@@ -17,7 +18,9 @@ class HostedLlm(Node):
 
     The provider absorbs any load, so there is no queue and no concurrency cap: the only limit is
     `rateLimitRpm`. That is a bucket of rate-limit *permits* (never called tokens here, to keep them
-    apart from LLM tokens): it holds up to `rateLimitRpm`, starts full and refills continuously.
+    apart from LLM tokens): it holds up to `rateLimitRpm` and refills continuously, but starts with
+    only one second's worth (at least one). Starting full would hand every run a free minute of
+    traffic, so a 60 s run would pass nearly twice the limit before its first 429.
     A call that finds it empty gets a 429, backs off and retries up to `maxRetries` times, then the
     request fails as `rate_limited`. The span's `queue_ms` is that backoff time; `work_ms` is the call.
 
@@ -35,10 +38,8 @@ class HostedLlm(Node):
         self._usd_per_token = (p.input_usd_per_1m / 1e6, p.output_usd_per_1m / 1e6)
         self._max_retries = p.max_retries
 
-        self._capacity = p.rate_limit_rpm
-        self._refill_per_ms = p.rate_limit_rpm / 60_000
-        self._permits = p.rate_limit_rpm
-        self._refilled_at = 0.0
+        rpm = p.rate_limit_rpm
+        self._permits = TokenBucket(capacity=rpm, rate=rpm / 60_000, permits=max(1.0, rpm / 60))
 
         self._work_rng = stream(seed, node.id, "work")
         self._tokens_rng = stream(seed, node.id, "tokens")
@@ -53,7 +54,7 @@ class HostedLlm(Node):
         """One LLM call of the given size. The agent node calls this with growing prompts."""
         started_at = self.env.now
         attempt = 0
-        while not self._take_permit():
+        while self._permits.take(self.env.now):  # a wait: no permit this time
             self.rejects += 1
             if attempt == self._max_retries:
                 req.status = "rate_limited"
@@ -76,13 +77,3 @@ class HostedLlm(Node):
     def backoff_ms(self, attempt: int) -> float:
         """Wait before retry number `attempt` (0-based): exponential, capped, plus jitter."""
         return min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2**attempt) + self._retry_rng.uniform(0, JITTER_MS)
-
-    def _take_permit(self) -> bool:
-        """Top the bucket up for the time since the last look, then spend one permit if there is one."""
-        now = self.env.now
-        self._permits = min(self._capacity, self._permits + (now - self._refilled_at) * self._refill_per_ms)
-        self._refilled_at = now
-        if self._permits < 1:
-            return False
-        self._permits -= 1
-        return True

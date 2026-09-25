@@ -9,6 +9,7 @@ import json
 from fastapi import Request
 
 from amber.api.errors import ApiError
+from amber.token_bucket import TokenBucket
 
 MAX_BODY_BYTES = 256 * 1024
 SIMULATIONS_PER_MINUTE = 30  # per client IP
@@ -17,7 +18,8 @@ MAX_WALL_S = 20.0  # real seconds one simulation may take before it is stopped (
 
 
 class RateLimiter:
-    """A token bucket per client: `per_minute` permits, refilled continuously, starting full.
+    """A token bucket per client: `per_minute` permits, refilled continuously, starting full, so a new
+    visitor can run a burst of simulations straight away.
 
     In memory, so it covers one container only; `docs/later.md` has what replaces it at scale.
     """
@@ -25,17 +27,16 @@ class RateLimiter:
     def __init__(self, per_minute: int):
         self.capacity = per_minute
         self.per_second = per_minute / 60
-        self._buckets: dict[str, tuple[float, float]] = {}  # client → (permits, at)
+        self._buckets: dict[str, TokenBucket] = {}
 
     def take(self, client: str, now: float) -> float:
         """Take one permit for `client` at time `now` (seconds). Returns 0 if it got one, else the
         seconds until one is free, for the 429's `Retry-After`."""
-        permits, at = self._buckets.get(client, (self.capacity, now))
-        permits = min(self.capacity, permits + (now - at) * self.per_second)
-        if permits < 1:
-            self._buckets[client] = (permits, now)
-            return (1 - permits) / self.per_second
-        self._buckets[client] = (permits - 1, now)
+        bucket = self._buckets.get(client)
+        if bucket is None:
+            bucket = self._buckets[client] = TokenBucket(self.capacity, self.per_second, self.capacity, now)
+        if wait_s := bucket.take(now):
+            return wait_s
         if len(self._buckets) > 10_000:
             self._forget_idle(now)
         return 0.0
@@ -44,7 +45,7 @@ class RateLimiter:
         """Drop clients whose bucket has refilled: forgetting them changes nothing, and it keeps a
         stream of new addresses from growing the dict forever."""
         full_after = self.capacity / self.per_second
-        self._buckets = {c: v for c, v in self._buckets.items() if now - v[1] < full_after}
+        self._buckets = {c: b for c, b in self._buckets.items() if now - b.at < full_after}
 
 
 async def read_json(request: Request) -> object:
