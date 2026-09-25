@@ -1,0 +1,115 @@
+{
+  "description": "An agent asks for 600 output tokens per call, but its self-hosted LLM reserves KV for only 512.",
+  "expect": [
+    "PARAM_RANGE"
+  ],
+  "config": {
+    "durationS": 60,
+    "seed": 42,
+    "warmupS": 5
+  },
+  "design": {
+    "name": "reserve-below-output",
+    "version": 1,
+    "nodes": [
+      {
+        "id": "users",
+        "kind": "users",
+        "label": "users",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "params": {
+          "traffic": {
+            "type": "constant",
+            "rps": 1
+          },
+          "clientTimeoutMs": 60000
+        }
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "label": "api",
+        "position": {
+          "x": 200,
+          "y": 0
+        },
+        "params": {
+          "replicas": 1,
+          "concurrencyPerReplica": 50,
+          "queueLimit": 200,
+          "work": {
+            "p50Ms": 10,
+            "p99Ms": 60
+          },
+          "costPerReplicaMonth": 30
+        }
+      },
+      {
+        "id": "agent",
+        "kind": "agent",
+        "label": "Agent",
+        "position": {
+          "x": 400,
+          "y": 0
+        },
+        "params": {
+          "llmCallsMean": 3,
+          "toolCallsPerStep": 1,
+          "toolLatency": {
+            "p50Ms": 200,
+            "p99Ms": 1500
+          },
+          "basePromptTokens": 800,
+          "contextGrowthTokensPerStep": 300,
+          "outputTokensPerCall": 600
+        }
+      },
+      {
+        "id": "llm",
+        "kind": "llm",
+        "label": "LLM",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "params": {
+          "mode": "selfHosted",
+          "gpuPresetId": "nvidia-l4-24gb",
+          "modelPresetId": "llama-3.1-8b-instruct-fp16",
+          "profileId": "default",
+          "replicas": 1,
+          "maxBatchSize": 32,
+          "maxBatchTokens": 4096,
+          "maxOutputTokensReserve": 512,
+          "speculative": {
+            "enabled": false,
+            "draftTokens": 4,
+            "acceptanceRate": 0.7,
+            "draftStepMs": 3
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_users_api",
+        "source": "users",
+        "target": "api"
+      },
+      {
+        "id": "e_api_agent",
+        "source": "api",
+        "target": "agent"
+      },
+      {
+        "id": "e_agent_llm",
+        "source": "agent",
+        "target": "llm",
+        "role": "llm"
+      }
+    ]
+  }
+}

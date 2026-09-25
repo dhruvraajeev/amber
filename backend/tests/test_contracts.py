@@ -13,6 +13,9 @@ from amber.presets import SHARED
 
 TEMPLATES = sorted((SHARED / "templates").glob("*.json"))
 FIXTURES = sorted((SHARED / "fixtures" / "graph").glob("*.json"))
+# PARAM_RANGE fixtures whose problem only graph.py can see: a model too big for its GPU, an output
+# reserve smaller than what the LLM's callers ask for.
+GRAPH_PARAM_RANGE_FIXTURES = {"model-does-not-fit", "reserve-below-output"}
 
 
 def load(path: Path) -> dict:
@@ -48,9 +51,9 @@ def test_python_fields_are_snake_case_json_is_camel_case():
 @pytest.mark.parametrize("path", FIXTURES, ids=lambda p: p.stem)
 def test_graph_fixtures_parse_unless_they_break_a_field_range(path):
     """Structural problems (cycles, bad edges, limits) are graph.py's job, so those designs still parse.
-    So are checks that read the preset files: a model too big for its GPU is in range field by field."""
+    So do the ones graph.py finds by reading the preset files or the edges: every field is in range."""
     fixture = load(path)
-    if "PARAM_RANGE" in fixture["expect"] and path.stem != "model-does-not-fit":
+    if "PARAM_RANGE" in fixture["expect"] and path.stem not in GRAPH_PARAM_RANGE_FIXTURES:
         with pytest.raises(ValidationError):
             Design.model_validate(fixture["design"])
     else:

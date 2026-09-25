@@ -121,6 +121,67 @@ def test_an_unknown_gpu_is_reported_once_not_also_as_does_not_fit():
     assert codes(design) == ["PARAM_RANGE"]
 
 
+def reserve_fixture() -> dict:
+    return load(SHARED / "fixtures" / "graph" / "reserve-below-output.json")["design"]
+
+
+def by_id(design: dict, node_id: str) -> dict:
+    return next(n for n in design["nodes"] if n["id"] == node_id)
+
+
+def test_an_output_reserve_below_what_the_agent_asks_for_is_a_param_range_on_the_reserve():
+    """Same words as the frontend (validate.test.ts)."""
+    design = reserve_fixture()
+    [issue] = validate(design)
+    assert (issue.code, issue.node_id, issue.path) == ("PARAM_RANGE", "llm", "params.maxOutputTokensReserve")
+    assert issue.message == (
+        "LLM: the output reserve (512 tokens) is smaller than the 600 tokens Agent asks for per call. "
+        "Raise maxOutputTokensReserve to at least 600."
+    )
+    by_id(design, "llm")["params"]["maxOutputTokensReserve"] = 600  # exactly enough is enough
+    assert validate(design) == []
+
+
+def test_a_caller_without_an_agent_asks_for_the_models_default_output():
+    """A service calling the LLM directly, or an agent's tool edge, gets the model's 256 default (§8.5)."""
+    design = reserve_fixture()
+    by_id(design, "agent")["params"]["outputTokensPerCall"] = 100
+    by_id(design, "llm")["params"]["maxOutputTokensReserve"] = 200
+    assert validate(design) == []  # 100 fits in 200
+    tool = {"id": "e_agent_tool", "source": "agent", "target": "llm", "role": "tool"}
+    [issue] = validate({**design, "edges": [*design["edges"], tool]})
+    assert "256 tokens the model writes by default for calls from Agent" in issue.message  # not its 100
+    design["edges"].append({"id": "e_api_llm", "source": "api", "target": "llm"})
+    design["edges"].append({"id": "e_agent_tool", "source": "agent", "target": "llm", "role": "tool"})
+    [issue] = validate(design)
+    assert issue.message == (
+        "LLM: the output reserve (200 tokens) is smaller than the 256 tokens the model writes by default "
+        "for calls from api. Raise maxOutputTokensReserve to at least 256."
+    )  # the largest ask wins, and of two equal asks the first edge's
+
+
+def test_the_reserve_check_waits_for_valid_fields_and_presets():
+    design = reserve_fixture()
+    by_id(design, "llm")["params"]["maxOutputTokensReserve"] = 0  # out of range: the contract says so
+    assert [i.path for i in validate(design)] == ["params.maxOutputTokensReserve"]
+    design = reserve_fixture()
+    by_id(design, "agent")["params"]["outputTokensPerCall"] = 0  # only the agent's own field error
+    assert [(i.node_id, i.path) for i in validate(design)] == [("agent", "params.outputTokensPerCall")]
+    design = reserve_fixture()
+    by_id(design, "llm")["params"]["modelPresetId"] = "no-such-model"  # no model, no default to compare
+    assert [i.message for i in validate(design)] == ['LLM: unknown preset "no-such-model".']
+    design = reserve_fixture()
+    by_id(design, "agent")["params"] = "not an object"  # malformed JSON doesn't crash
+    assert [(i.node_id, i.path) for i in validate(design)] == [("agent", "params")]  # its own error only
+
+
+def test_an_unknown_profile_still_leaves_the_other_self_hosted_checks_running():
+    """validate.ts can't see profile ids, so an unknown one must not hide what it does report."""
+    design = load(SHARED / "fixtures" / "graph" / "model-does-not-fit.json")["design"]
+    node(design, "llm")["params"]["profileId"] = "no-such-profile"
+    assert [i.path for i in validate(design)] == ["params.profileId", "params.gpuPresetId"]
+
+
 def test_limit_duration_points_at_the_config_field():
     [issue] = validate(valid_design(), {**CONFIG, "durationS": 5})
     assert (issue.code, issue.path) == ("LIMIT_DURATION", "config.durationS")

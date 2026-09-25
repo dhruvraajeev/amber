@@ -40,6 +40,28 @@ describe('validate', () => {
     expect(validate(q4)).toEqual([]) // 4.9 GB of quantized weights fit
   })
 
+  it('refuses an output reserve smaller than what callers ask for, with the same words as the backend', () => {
+    const f = Object.entries(fixtures).find(([file]) => file.endsWith('reserve-below-output.json'))![1]
+    expect(validate(f.design)).toEqual([{
+      code: 'PARAM_RANGE', nodeId: 'llm', path: 'params.maxOutputTokensReserve',
+      message: 'LLM: the output reserve (512 tokens) is smaller than the 600 tokens Agent asks for per call. Raise maxOutputTokensReserve to at least 600.',
+    }])
+    const d = structuredClone(f.design)
+    const agent = d.nodes.find((n) => n.id === 'agent')!
+    const llm = d.nodes.find((n) => n.id === 'llm')!
+    if (llm.kind === 'llm' && llm.params.mode === 'selfHosted') llm.params.maxOutputTokensReserve = 600
+    expect(validate(d)).toEqual([]) // exactly enough is enough
+    if (agent.kind === 'agent') agent.params.outputTokensPerCall = 100
+    if (llm.kind === 'llm' && llm.params.mode === 'selfHosted') llm.params.maxOutputTokensReserve = 200
+    expect(validate(d)).toEqual([])
+    const tool = { id: 'e_agent_tool', source: 'agent', target: 'llm', role: 'tool' as const }
+    expect(validate({ ...d, edges: [...d.edges, tool] })[0].message).toContain('256 tokens the model writes by default for calls from Agent')
+    d.edges.push({ id: 'e_api_llm', source: 'api', target: 'llm' }, { id: 'e_agent_tool', source: 'agent', target: 'llm', role: 'tool' })
+    expect(validate(d).map((i) => i.message)).toEqual([
+      'LLM: the output reserve (200 tokens) is smaller than the 256 tokens the model writes by default for calls from api. Raise maxOutputTokensReserve to at least 256.',
+    ])
+  })
+
   it('treats an emptied number field (NaN) as out of range', () => {
     const f = Object.entries(fixtures).find(([file]) => file.endsWith('valid.json'))![1]
     const d = structuredClone(f.design)

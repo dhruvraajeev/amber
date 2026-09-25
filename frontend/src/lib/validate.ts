@@ -34,10 +34,10 @@ export function validate(design: Design, config?: RunConfig): ValidationIssue[] 
     return ok
   })
   const out = new Map<string, DesignEdge[]>(design.nodes.map((n) => [n.id, []]))
-  const incoming = new Map<string, number>(design.nodes.map((n) => [n.id, 0]))
+  const into = new Map<string, DesignEdge[]>(design.nodes.map((n) => [n.id, []]))
   for (const e of edges) {
     out.get(e.source)!.push(e)
-    incoming.set(e.target, incoming.get(e.target)! + 1)
+    into.get(e.target)!.push(e)
   }
 
   const users = design.nodes.filter((n) => n.kind === 'users')
@@ -48,7 +48,7 @@ export function validate(design: Design, config?: RunConfig): ValidationIssue[] 
     const at = { nodeId: node.id }
     switch (node.kind) {
       case 'users':
-        if (o.length !== 1 || incoming.get(node.id)! > 0)
+        if (o.length !== 1 || into.get(node.id)!.length > 0)
           add('USERS_EDGES', `${node.label} needs exactly one outgoing edge and no incoming ones.`, at)
         break
       case 'loadBalancer':
@@ -95,9 +95,11 @@ export function validate(design: Design, config?: RunConfig): ValidationIssue[] 
   for (const n of design.nodes)
     if (!reached.has(n.id)) add('UNREACHABLE', `${n.label} gets no traffic: no path leads to it from a Users node.`, { nodeId: n.id })
 
-  for (const node of design.nodes)
-    for (const [path, what] of paramProblems(node))
+  for (const node of design.nodes) {
+    const callers = into.get(node.id)!.map((edge): Caller => ({ edge, source: byId.get(edge.source)! }))
+    for (const [path, what] of paramProblems(node, callers))
       add('PARAM_RANGE', `${node.label}: ${what}`, { nodeId: node.id, path: `params.${path}` })
+  }
 
   // ponytail: sums each users node's own peak, so two spikes at different times over-count; exact max if it matters.
   const peakRps = users.reduce((sum, n) => sum + (n.kind === 'users' ? peak(n.params.traffic) : 0), 0)
@@ -146,6 +148,8 @@ function peak(t: TrafficProfile): number {
 // Written as `!(ok)` so NaN (an emptied number field) always fails.
 
 type Problem = [path: string, message: string]
+/** One incoming edge and the node it comes from. */
+type Caller = { edge: DesignEdge; source: DesignNode }
 
 const within = (path: string, v: number, lo: number, hi = Infinity, whole = false): Problem[] =>
   v >= lo && v <= hi && (!whole || Number.isInteger(v))
@@ -170,7 +174,29 @@ function modelFits(gpuId: string, modelId: string): Problem[] {
     `the model does not fit on this GPU (${model.weightsGb} GB of weights, ${Number(usable.toFixed(2))} GB usable on the ${gpu.name}).`]]
 }
 
-function paramProblems(node: DesignNode): Problem[] {
+// Admission sets aside KV for the prompt plus the output reserve (§8.7) and nothing grows it later, so the
+// reserve must cover the longest answer a caller asks for: an agent's llm edge asks for its
+// outputTokensPerCall, any other caller for the model's defaultOutputTokens (§8.5). The largest ask is
+// reported; ties go to the first edge. Backend: graph._reserve_too_small, same words.
+function reserveCoversOutput(reserve: number, modelId: string, callers: Caller[]): Problem[] {
+  const model = models.find((m) => m.id === modelId)
+  if (!model || !isCount(reserve)) return [] // an unknown id or a bad reserve is its own issue
+  let need = 0
+  let who = ''
+  for (const { edge, source } of callers) {
+    const [tokens, asker] =
+      source.kind === 'agent' && edge.role === 'llm'
+        ? [source.params.outputTokensPerCall, `${source.label} asks for per call`]
+        : [model.defaultOutputTokens, `the model writes by default for calls from ${source.label}`]
+    if (isCount(tokens) && tokens > need) [need, who] = [tokens, asker]
+  }
+  return need <= reserve ? [] : [['maxOutputTokensReserve',
+    `the output reserve (${reserve} tokens) is smaller than the ${need} tokens ${who}. Raise maxOutputTokensReserve to at least ${need}.`]]
+}
+
+const isCount = (v: number) => Number.isInteger(v) && v >= 1
+
+function paramProblems(node: DesignNode, callers: Caller[]): Problem[] {
   switch (node.kind) {
     case 'users': {
       const { traffic: t, clientTimeoutMs } = node.params
@@ -237,6 +263,7 @@ function paramProblems(node: DesignNode): Problem[] {
         ...known('gpuPresetId', p.gpuPresetId, gpus),
         ...known('modelPresetId', p.modelPresetId, models),
         ...modelFits(p.gpuPresetId, p.modelPresetId),
+        ...reserveCoversOutput(p.maxOutputTokensReserve, p.modelPresetId, callers),
         ...(p.profileId ? [] : [['profileId', 'profileId is required.'] as Problem]),
         ...within('replicas', p.replicas, 1, 50, true),
         ...within('maxBatchSize', p.maxBatchSize, 1, Infinity, true),

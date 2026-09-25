@@ -64,10 +64,10 @@ def validate(design: object, config: object = None) -> list[ValidationIssue]:
             add("EDGE_REF", f"Edge {e['id']} points at a node that doesn't exist.", edge_id=e["id"])
     edges = [e for e in edges if e["source"] in by_id and e["target"] in by_id]
     out: dict[str, list[dict]] = {n["id"]: [] for n in nodes}
-    incoming = dict.fromkeys(by_id, 0)
+    into: dict[str, list[dict]] = {n["id"]: [] for n in nodes}
     for e in edges:
         out[e["source"]].append(e)
-        incoming[e["target"]] += 1
+        into[e["target"]].append(e)
 
     users = [n for n in nodes if n["kind"] == "users"]
     if not users:
@@ -77,7 +77,7 @@ def validate(design: object, config: object = None) -> list[ValidationIssue]:
         o, label, at = out[node["id"]], node["label"], {"node_id": node["id"]}
         match node["kind"]:
             case "users":
-                if len(o) != 1 or incoming[node["id"]] > 0:
+                if len(o) != 1 or into[node["id"]]:
                     add("USERS_EDGES", f"{label} needs exactly one outgoing edge and no incoming ones.", **at)
             case "loadBalancer":
                 if not o:
@@ -137,15 +137,9 @@ def validate(design: object, config: object = None) -> list[ValidationIssue]:
 
     issues += ranges
     for node in nodes:
-        for path, preset_id in _unknown_presets(node):
-            add(
-                "PARAM_RANGE",
-                f'{node["label"]}: unknown preset "{preset_id}".',
-                node_id=node["id"],
-                path=path,
-            )
-        if message := _model_does_not_fit(node):
-            add("PARAM_RANGE", f"{node['label']}: {message}", node_id=node["id"], path="params.gpuPresetId")
+        callers = [(e, by_id[e["source"]]) for e in into[node["id"]]]
+        for path, message in _llm_problems(node, callers):
+            add("PARAM_RANGE", f"{node['label']}: {message}", node_id=node["id"], path=path)
 
     # Users nodes whose traffic breaks a field range are already PARAM_RANGE; they add nothing here.
     traffic = [t for t in map(_parsed_traffic, users) if t is not None]
@@ -267,34 +261,77 @@ def _back_edge(nodes: list[dict], out: dict[str, list[dict]]) -> dict | None:
     return None
 
 
-def _unknown_presets(node: dict) -> list[tuple[str, str]]:
-    """(path, id) for each preset or profile id on an LLM node that names nothing that exists."""
+def _llm_problems(node: dict, callers: list[tuple[dict, dict]]) -> list[tuple[str, str]]:
+    """(path under the node, message) for each LLM setting the contracts can't judge field by field,
+    because it depends on the preset files or on who calls the node: an unknown preset or profile id, a
+    model too big for its GPU, an output reserve smaller than what callers ask for. `callers` are the
+    node's incoming (edge, source node) pairs, in edge order.
+    """
     params = node.get("params")
     if node["kind"] != "llm" or not isinstance(params, dict):
         return []
-    return [
-        (f"params.{field}", params[field])
+    unknown = [
+        (f"params.{field}", f'unknown preset "{params[field]}".')
         for (mode, field), known in PRESET_FIELDS.items()
         if params.get("mode") == mode and isinstance(params.get(field), str) and params[field] not in known()
     ]
+    if params.get("mode") != "selfHosted":
+        return unknown
+    # Each check below runs once the presets it reads exist, as in validate.ts.
+    gpu, model = _preset("gpus", params.get("gpuPresetId")), _preset("models", params.get("modelPresetId"))
+    problems = unknown
+    if gpu and model and (message := _model_does_not_fit(gpu, model)):
+        problems.append(("params.gpuPresetId", message))
+    if model and (message := _reserve_too_small(params.get("maxOutputTokensReserve"), model, callers)):
+        problems.append(("params.maxOutputTokensReserve", message))
+    return problems
 
 
-def _model_does_not_fit(node: dict) -> str | None:
-    """Why a self-hosted LLM's model can't load on its GPU, or None when it can (or the ids are unknown,
-    which `_unknown_presets` already reports). Without KV-cache room no call could ever be admitted."""
-    params = node.get("params")
-    if node["kind"] != "llm" or not isinstance(params, dict) or params.get("mode") != "selfHosted":
-        return None
-    gpu_id, model_id = params.get("gpuPresetId"), params.get("modelPresetId")
-    if not isinstance(gpu_id, str) or not isinstance(model_id, str):
-        return None  # malformed JSON: already a field error
-    gpu, model = presets("gpus").get(gpu_id), presets("models").get(model_id)
-    if gpu is None or model is None or kv_capacity_bytes(gpu, model) > 0:
+def _preset(file: str, preset_id: object) -> dict | None:
+    """The preset with this id, or None if it doesn't exist or the id isn't even a string."""
+    return presets(file).get(preset_id) if isinstance(preset_id, str) else None
+
+
+def _model_does_not_fit(gpu: dict, model: dict) -> str | None:
+    """Why the model can't load on the GPU, or None when it can. Without KV-cache room no call could
+    ever be admitted."""
+    if kv_capacity_bytes(gpu, model) > 0:
         return None
     usable = gpu["memoryGb"] * GPU_MEMORY_UTILIZATION
     return (
         f"the model does not fit on this GPU ({model['weightsGb']:g} GB of weights, "
         f"{usable:g} GB usable on the {gpu['name']})."
+    )
+
+
+def _reserve_too_small(reserve: object, model: dict, callers: list[tuple[dict, dict]]) -> str | None:
+    """Why `maxOutputTokensReserve` can't hold the longest answer a caller asks for, or None when it can.
+
+    Admission sets aside KV for the prompt plus the reserve (§8.7) and nothing grows it later, so an
+    answer longer than the reserve would write into KV memory no one set aside. An agent's `llm` edge
+    asks for its `outputTokensPerCall`; any other caller (a service, or an agent's tool edge) asks for
+    the model's `defaultOutputTokens` (§8.5). The largest ask is reported; ties go to the first edge.
+    """
+    if not _is_count(reserve):
+        return None  # out of range: already a field error
+    asks = []
+    for edge, source in callers:
+        if source["kind"] == "agent" and edge.get("role") == "llm":
+            params = source.get("params")
+            tokens = params.get("outputTokensPerCall") if isinstance(params, dict) else None
+            asks.append((tokens, f"{source['label']} asks for per call"))
+        else:
+            tokens = model["defaultOutputTokens"]
+            asks.append((tokens, f"the model writes by default for calls from {source['label']}"))
+    asks = [(int(tokens), who) for tokens, who in asks if _is_count(tokens)]
+    if not asks:
+        return None
+    need, who = max(asks, key=lambda ask: ask[0])  # max keeps the first of equals
+    if need <= reserve:
+        return None
+    return (
+        f"the output reserve ({int(reserve)} tokens) is smaller than the {need} tokens {who}. "
+        f"Raise maxOutputTokensReserve to at least {need}."
     )
 
 
@@ -307,3 +344,8 @@ def _parsed_traffic(users_node: dict) -> TrafficProfile | None:
 
 def _is_number(v: object) -> bool:
     return isinstance(v, int | float) and not isinstance(v, bool) and math.isfinite(v)
+
+
+def _is_count(v: object) -> bool:
+    """A whole number ≥ 1, as JSON may write it (2000 or 2000.0): what the contracts' `Count` accepts."""
+    return _is_number(v) and v >= 1 and float(v).is_integer()
