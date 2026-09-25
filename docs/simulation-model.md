@@ -101,8 +101,11 @@ bucket it was created in, an outcome into the bucket it ended in.
 - **The summary follows requests, not seconds.** It covers the requests that arrived after warmup, each
   counted once with its own outcome — the way a load test counts the requests it sends. A request that
   arrived during warmup never enters it, even if it finishes later. So requests = succeeded + failed +
-  timed out + still running when the run ended. The timeline instead counts each outcome in the second
-  it happened, which is what a throughput-over-time chart needs.
+  timed out + still running when the run ended. A request still running at the end whose client
+  timeout had already passed counts as timed out, at its deadline: its user gave up then, and it could
+  only finish later still. "Still running" is left for requests whose user is still waiting. The
+  timeline instead counts each outcome in the second it happened, which is what a throughput-over-time
+  chart needs.
 - **Downsampling**: the timeline is capped at 300 points, so runs longer than 300 s merge buckets in
   pairs. A merged point keeps the underlying counts and latency values, so its rates are true totals
   over its full width and its percentiles come from all of its latencies — not from averaging each
@@ -158,5 +161,6 @@ All of these are deliberate. They are listed in the app under "Model assumptions
 9. **Monthly cost is extrapolated** from the simulated window, as if that traffic ran all month.
 10. **One queue discipline: FIFO.** No priorities, no retries between your own services, no circuit
    breakers.
-11. **The run stops at its duration.** Requests still running then have no outcome and no latency,
-    so the summary leaves them out of the percentiles (it reports how many there were).
+11. **The run stops at its duration.** Requests still running then have no latency, so the
+    percentiles leave them out. Those already past their client timeout count as timeouts; the rest
+    have no outcome yet, and the summary reports how many there were.

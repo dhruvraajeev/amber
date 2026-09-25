@@ -165,6 +165,26 @@ def test_an_overloaded_design_rejects_requests_and_says_which_node():
     assert all("API" in b.message for b in critical)  # the node's label, not its id
 
 
+def test_an_overloaded_run_counts_requests_stuck_past_their_deadline_as_timeouts():
+    """Two slots for 200 rps and a 2 s client timeout, with room to queue everyone: the line grows all
+    run, so most requests are still waiting when it ends. Those whose user gave up are timeouts."""
+    raw = template("classic-web-app")
+    nodes = {n["id"]: n for n in raw["nodes"]}
+    nodes["n_users"]["params"]["clientTimeoutMs"] = 2000
+    nodes["n_api"]["params"] |= {"replicas": 1, "concurrencyPerReplica": 2, "queueLimit": 10_000}
+    run = execute(Design.model_validate(raw), config(duration_s=20))
+    s = run.metrics.summary()
+
+    waiting = [req for req, out in run.metrics.measured_outcomes if out is None]
+    cut_off = [req for req, out in run.metrics.measured_outcomes if out and out.latency_ms is None]
+    assert s.requests - s.completed - s.errors - s.timeouts == len(waiting)
+    assert all(req.deadline >= 20_000 for req in waiting)  # only users still inside their timeout
+    assert len(waiting) < 2 * 200 * 1.5  # at most ~2 s of arrivals, not the whole backlog
+    assert cut_off and all(req.end is None and req.deadline < 20_000 for req in cut_off)
+    assert s.timeouts > len(cut_off) > s.completed  # most of the backlog, already given up on
+    assert s.error_rate > 0.9
+
+
 def test_the_work_sampler_override_replaces_a_services_own_work_time():
     """The test-only seam the queueing-theory proofs need (§16). It is not part of any contract."""
     run = execute(design("classic-web-app"), config(duration_s=20), {"n_api": lambda: 40.0})

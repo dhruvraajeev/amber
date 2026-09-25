@@ -90,6 +90,6 @@ const ASSUMPTIONS = [
   'Prefill and decode times grow linearly with tokens and batch size.',
   'Speculative decoding accepts each draft token independently at a fixed rate; real acceptance varies with the text.',
   'Hosted LLM APIs have unlimited concurrency; only their rate limit turns requests away.',
-  'Results cover requests that arrive after warmup; any still running when the run ends have no latency yet.',
+  'Results cover requests that arrive after warmup. One still running when the run ends is a timeout if its user had already given up, and has no latency either way.',
   'Monthly cost assumes the simulated traffic pattern repeats all month.',
 ]

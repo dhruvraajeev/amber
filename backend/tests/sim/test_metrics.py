@@ -96,6 +96,28 @@ def test_the_summary_counts_post_warmup_arrivals_each_with_its_own_outcome():
     assert timeline[9].error_rate == 1  # the timeout ended in the last bucket
 
 
+def test_a_request_still_running_past_its_clients_deadline_is_a_timeout_at_that_deadline():
+    reqs = [
+        req(1000, None, None),  # deadline 6 s, still running at the end of a 10 s run: timed out at 6 s
+        req(2000, 12000),  # ends after the run, deadline 7 s: within the run, a timeout at 7 s
+        req(3000, 3500),
+        req(5000, None, None),  # deadline exactly at the run's end: its client is still waiting
+        req(6000, None, None),  # deadline 11 s: still waiting
+    ]
+    metrics = with_requests(10, reqs)
+
+    s = metrics.summary()
+    assert (s.requests, s.completed, s.timeouts, s.errors) == (5, 1, 2, 0)
+    assert s.requests - s.completed - s.timeouts - s.errors == 2  # only the two still waiting
+    assert s.error_rate == 2 / 3
+    assert (s.latency_ms.p50, s.latency_ms.max) == (500, 500)  # no response came, so no latency
+    assert [r.created_at for r in metrics.answered()] == [3000]  # nor attribution
+
+    timeline = metrics.timeline()
+    assert (timeline[6].error_rate, timeline[7].error_rate) == (1, 1)  # each in its deadline's second
+    assert sum(p.error_rate for p in timeline) == 2
+
+
 def test_no_llm_means_no_ttft_and_an_all_warmup_run_summarizes_everything():
     s = with_requests(10, [req(0, 100), req(9000, 9100)], warmup_s=60).summary()
     assert s.requests == 2 and s.ttft_ms is None

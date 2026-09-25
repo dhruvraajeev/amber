@@ -2,7 +2,7 @@
 
 Two kinds of data go into a bucket:
 - Per request, sorted in after the run: an arrival counts in the bucket where the request was created;
-  its outcome (status, latency) counts in the bucket where it ended.
+  its outcome (status, latency) counts in the bucket where it happened (`outcome`).
 - Per node, sampled live: a small process wakes at the end of every bucket and reads each node's
   counters (`Node.resources`, `served`, `rejects`), keeping what changed since the last bucket. It
   also takes one GPU snapshot per self-hosted LLM node (`RunResult.gpu`, §7.4).
@@ -13,7 +13,10 @@ clamped: a value above 1 would mean a modelling bug, and hiding it would hide th
 The summary describes one set of requests: those that arrived after the first `warmupS` seconds (the
 system starts empty, which flatters it), each counted once with its own outcome, as a benchmark counts
 the requests it sends. So `requests` = completed + errors + timeouts + those still running at the end.
-The timeline keeps every second, warmup included, and counts each outcome in the second it happened.
+A request still running when the run stops is a timeout if its client's deadline had already passed:
+its client gave up then, whatever the servers do later. Only one whose client is still waiting has no
+outcome yet. The timeline keeps every second, warmup included, and counts each outcome in the second
+it happened.
 
 A timeline over 300 buckets is merged in pairs. Merging keeps the raw counts and latencies, so a merged
 point is exact: its rates are totals over its whole width, and its percentiles come from all of its
@@ -42,7 +45,7 @@ from amber.sim.kernel import Environment, Process, ProcessGen, Timeout
 from amber.sim.nodes import Node
 from amber.sim.nodes.llm_selfhosted import SelfHostedLlm
 from amber.sim.nodes.users import Users
-from amber.sim.request import Request
+from amber.sim.request import Request, Status
 
 BUCKET_MS = 1000.0
 MAX_POINTS = 300
@@ -68,6 +71,30 @@ class Bucket:
     ends: Counter[str] = field(default_factory=Counter)  # status -> requests that ended here
     latencies: list[float] = field(default_factory=list)  # ms, answered requests only
     nodes: dict[str, NodeSample] = field(default_factory=dict)
+
+
+class Outcome(NamedTuple):
+    """How one request turned out, as far as the run can tell."""
+
+    status: Status
+    at_ms: float  # when it happened: the request's end, or its client's deadline
+    latency_ms: float | None  # end − created, for a request that got a response (late or not)
+
+
+def outcome(req: Request, run_end_ms: float) -> Outcome | None:
+    """The request's outcome by `run_end_ms`, or None while its client is still waiting.
+
+    A request that ended in time has its own status. One still running (or ending only after the run)
+    whose deadline passed before the run ended is a timeout at that deadline: it will end even later,
+    so `Request.finish` could only say timeout too. It has no latency, since no response ever came
+    within the run; its span trail is also incomplete, which keeps it out of attribution.
+    """
+    if req.end is not None and req.end < run_end_ms:
+        latency = req.end - req.created_at if req.status in ANSWERED else None
+        return Outcome(req.status, req.end, latency)
+    if req.deadline < run_end_ms:
+        return Outcome("timeout", req.deadline, None)
+    return None
 
 
 class Metrics:
@@ -121,18 +148,21 @@ class Metrics:
         return [r for node in self.nodes.values() if isinstance(node, Users) for r in node.requests]
 
     @cached_property
+    def outcomes(self) -> list[tuple[Request, Outcome | None]]:
+        """Every request with its outcome at the end of the run. Read after the run."""
+        return [(req, outcome(req, self._duration_ms)) for req in self.requests]
+
+    @cached_property
     def buckets(self) -> list[Bucket]:
-        """Every bucket, with each request sorted in. Read after the run."""
-        for req in self.requests:
+        """Every bucket, with each request's arrival and outcome sorted in. Read after the run."""
+        for req, out in self.outcomes:
             self._buckets[int(req.created_at // BUCKET_MS)].arrivals += 1
-            # Still in flight when the run stopped (an arrival with no outcome), or ended after the
-            # last bucket if the run was allowed past its duration.
-            if req.end is None or req.end >= self._duration_ms:
+            if out is None:
                 continue
-            bucket = self._buckets[int(req.end // BUCKET_MS)]
-            bucket.ends[req.status] += 1
-            if req.status in ANSWERED:
-                bucket.latencies.append(req.end - req.created_at)
+            bucket = self._buckets[int(out.at_ms // BUCKET_MS)]
+            bucket.ends[out.status] += 1
+            if out.latency_ms is not None:
+                bucket.latencies.append(out.latency_ms)
         return self._buckets
 
     @property
@@ -141,34 +171,28 @@ class Metrics:
         return [b for b in self.buckets if b.t >= self._warmup_s] or self.buckets
 
     @cached_property
-    def measured_requests(self) -> list[Request]:
-        """The requests the summary describes: those that arrived after warmup. Read after the run."""
+    def measured_outcomes(self) -> list[tuple[Request, Outcome | None]]:
+        """The requests the summary describes, those that arrived after warmup, with their outcomes."""
         start_ms = self.measured[0].t * 1000
-        return [r for r in self.requests if r.created_at >= start_ms]
-
-    @cached_property
-    def finished(self) -> list[Request]:
-        """Measured requests with an outcome; the rest were still running when the run stopped."""
-        return [r for r in self.measured_requests if r.end is not None and r.end < self._duration_ms]
+        return [(req, out) for req, out in self.outcomes if req.created_at >= start_ms]
 
     def answered(self) -> list[Request]:
-        """Finished requests that got a response, late or not: what latency and attribution look at."""
-        return [r for r in self.finished if r.status in ANSWERED]
+        """Measured requests that got a response, late or not: what latency and attribution look at."""
+        return [req for req, out in self.measured_outcomes if out is not None and out.latency_ms is not None]
 
     def summary(self) -> Summary:
-        ends = Counter(r.status for r in self.finished)
-        answered = self.answered()
-        latencies = [r.end - r.created_at for r in answered]
-        ttfts = [r.first_token_at - r.created_at for r in answered if r.first_token_at is not None]
-        finished = ends.total()
+        outcomes = [out for _, out in self.measured_outcomes if out is not None]
+        ends = Counter(out.status for out in outcomes)
+        latencies = [out.latency_ms for out in outcomes if out.latency_ms is not None]
+        ttfts = [r.first_token_at - r.created_at for r in self.answered() if r.first_token_at is not None]
         return Summary(
-            requests=len(self.measured_requests),
+            requests=len(self.measured_outcomes),
             completed=ends["ok"],
             errors=sum(ends[s] for s in ERRORS),
             timeouts=ends["timeout"],
             rejected=ends["rejected"],
             throughput_rps=ends["ok"] / _seconds(self.measured),
-            error_rate=(finished - ends["ok"]) / finished if finished else 0.0,
+            error_rate=_error_rate(ends),
             latency_ms=LatencySummary(**_percentiles(latencies), max=max(latencies, default=0.0)),
             ttft_ms=Percentiles(**_percentiles(ttfts)) if ttfts else None,
         )
@@ -181,12 +205,11 @@ class Metrics:
     def _point(self, group: list[Bucket]) -> TimelinePoint:
         seconds = _seconds(group)
         ends = sum((b.ends for b in group), Counter())
-        finished = ends.total()
         return TimelinePoint(
             t=group[0].t,
             arrivals_rps=sum(b.arrivals for b in group) / seconds,
             throughput_rps=ends["ok"] / seconds,
-            error_rate=(finished - ends["ok"]) / finished if finished else 0.0,
+            error_rate=_error_rate(ends),
             **_percentiles([x for b in group for x in b.latencies]),
             nodes={nid: _node_point([b.nodes[nid] for b in group], seconds) for nid in self.nodes},
         )
@@ -215,6 +238,12 @@ class Metrics:
 
 def _seconds(buckets: list[Bucket]) -> float:
     return sum(b.width_ms for b in buckets) / 1000
+
+
+def _error_rate(ends: Counter[str]) -> float:
+    """The share of outcomes that weren't "ok"; 0 when nothing had an outcome."""
+    total = ends.total()
+    return (total - ends["ok"]) / total if total else 0.0
 
 
 def _node_point(samples: list[NodeSample], seconds: float) -> NodePoint:
