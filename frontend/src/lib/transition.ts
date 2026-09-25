@@ -4,5 +4,6 @@ import { flushSync } from 'react-dom'
 // instead of jumping. Browsers without the API just apply the change.
 export function transition(update: () => void) {
   if (!('startViewTransition' in document)) return update()
-  document.startViewTransition(() => flushSync(update))
+  // A click mid-transition aborts it and `ready` rejects; the update still applies, so that's not an error.
+  document.startViewTransition(() => flushSync(update)).ready.catch(() => {})
 }
