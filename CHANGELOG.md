@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.0.1 — 2026-09-25
+
+Post-release fixes. No new features.
+
+### Fixed
+- **Hosted LLM cost was too low on short runs.** A call was billed only when it finished, so calls still
+  streaming when the run ended were dropped, and the empty first seconds of a run were averaged in. A
+  60 s run reported the RAG template's LLM bill 7% low (13% at 30 s). Calls are now billed when admitted,
+  from the end of warmup, and the monthly figure scales from the time after warmup. Measured against the
+  exact formula over 400 runs, it is now within 2.5% at 30 s and within 1% at 60 s.
+- The Users node showed 0 req/s during replay and in per-node data; it now shows what it sends.
+- The MCP server reported an empty version to clients; it now reports its package version.
+- The architecture diagram in `docs/architecture.md` failed to render on GitHub (a reserved word as a
+  node id).
+
+### Changed
+- The MCP design guide and `model_codebase` prompt tell agents three things that decide accuracy on a real
+  codebase: count Python worker processes, not threads, as parallel capacity; use latencies measured
+  under load; and warn that p99 is fragile when anything is over 80% busy.
+- README rewritten in plain language: screenshots, a glossary, two diagrams, and measured accuracy,
+  including Amber predicting its own API under real load.
+
+### Removed
+- The frontend's unused copy of the design hash (the backend sends it in every result).
+- The `/share/:token` placeholder page (share links come with v1.2).
+- The always-empty `profiles` list in `GET /api/presets` (it returns when calibration adds profiles).
+
 ## v1.0.0 — 2026-09-25
 
 The first release: a complete architecture simulator you can use in the browser, from a terminal, or

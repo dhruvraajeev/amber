@@ -15,7 +15,7 @@ flowchart LR
     client["Claude Code / Cursor /<br/>Claude Desktop"] -- stdio --> mcp["amber-mcp<br/>(mcp/)"]
   end
   subgraph container["One container (Docker / Azure Container Apps)"]
-    api["FastAPI<br/>backend/amber/api"] --> graph["validate<br/>sim/graph.py"]
+    api["FastAPI<br/>backend/amber/api"] --> checks["validate<br/>sim/graph.py"]
     api --> sim["simulator<br/>sim/run.py → kernel, nodes,<br/>metrics, analysis, cost"]
     api -. serves .-> dist["built UI<br/>frontend/dist"]
   end
@@ -73,12 +73,12 @@ The contracts are defined in `backend/amber/contracts.py`. FastAPI turns them in
 schema; `npm run gen:types` turns that into `frontend/src/api/generated.ts`. CI regenerates the file
 and fails if it differs from the committed one, so the frontend can't drift from the backend.
 
-Two things are deliberately checked on both sides:
+The graph rules are deliberately checked on both sides: `lib/validate.ts` (instant feedback) and
+`sim/graph.py` (the authority) both run every case in `shared/fixtures/graph/`, each of which lists
+the exact error codes it must produce.
 
-- **Graph rules.** `lib/validate.ts` (instant feedback) and `sim/graph.py` (the authority) both run
-  every case in `shared/fixtures/graph/`, each of which lists the exact error codes it must produce.
-- **The design hash.** Both sides hash the same canonical JSON (sorted keys, positions dropped,
-  whole floats written as integers), so moving a node never makes a run look like a new design.
+The design hash in every result is the backend's: SHA-256 of canonical JSON (sorted keys, positions
+dropped, whole floats written as integers), so moving a node never makes a run look like a new design.
 
 ## Determinism
 
