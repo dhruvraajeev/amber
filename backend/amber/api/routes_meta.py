@@ -1,5 +1,6 @@
 """The read-only endpoints (plan §9): health, presets and templates. All cached; none touch the simulator."""
 
+import os
 from importlib.metadata import version
 
 from fastapi import APIRouter
@@ -12,8 +13,9 @@ router = APIRouter()
 
 @router.get("/healthz")
 async def healthz() -> dict[str, str]:
-    """Liveness. `async` so it is answered on the event loop, even while simulations fill the threads."""
-    return {"status": "ok", "version": version("amber")}
+    """Liveness, and which commit is running: the published image carries its git sha (AMBER_SHA), so a
+    redeploy can be confirmed from outside. `async` so it answers even while simulations fill the threads."""
+    return {"status": "ok", "version": version("amber"), "sha": os.environ.get("AMBER_SHA", "dev")}
 
 
 @router.get("/api/presets")

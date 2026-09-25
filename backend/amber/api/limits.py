@@ -21,7 +21,8 @@ class RateLimiter:
     """A token bucket per client: `per_minute` permits, refilled continuously, starting full, so a new
     visitor can run a burst of simulations straight away.
 
-    In memory, so it covers one container only; `docs/later.md` has what replaces it at scale.
+    In memory, so it covers one container only. At more than one replica it needs a shared store
+    (Redis, or a Mongo TTL collection) or the ingress to do the limiting.
     """
 
     def __init__(self, per_minute: int):

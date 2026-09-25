@@ -19,7 +19,7 @@ export const toFlowNode = ({ id, position, ...data }: DesignNode): FlowNode => (
 export const toFlowEdge = ({ id, source, target, role }: DesignEdge): FlowEdge => ({ id, source, target, type: 'traffic', data: { role }, label: role })
 
 // Canonical JSON (§7.4): sorted keys, no positions, no undefined fields. Moving a node never changes it.
-// The backend must produce byte-identical output (see docs/decisions.md).
+// The backend must produce byte-identical output.
 export function canonicalDesign(design: Design): string {
   return stableStringify({ ...design, nodes: design.nodes.map((n) => ({ ...n, position: undefined })) })
 }

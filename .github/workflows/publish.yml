@@ -33,5 +33,6 @@ jobs:
             ghcr.io/${{ github.repository }}:latest
           # Links the package to this repo, so it shows on the repo page.
           labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          build-args: AMBER_SHA=${{ github.sha }} # /healthz reports it, so a deploy can be confirmed
           cache-from: type=gha
           cache-to: type=gha,mode=max

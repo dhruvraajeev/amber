@@ -24,7 +24,7 @@ def without_wall_fields(result: dict) -> dict:
 
 
 def test_healthz(client):
-    assert client.get("/healthz").json() == {"status": "ok", "version": "0.1.0"}
+    assert client.get("/healthz").json() == {"status": "ok", "version": "0.1.0", "sha": "dev"}
 
 
 def test_presets_are_the_shared_files_under_the_frontends_names(client):

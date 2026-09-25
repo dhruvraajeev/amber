@@ -36,6 +36,10 @@ ENV PATH="/app/backend/.venv/bin:$PATH"
 # ingress), never "*": with "*" uvicorn believes the client's own first entry, so anyone could dodge the
 # per-IP rate limit. Overridable at deploy time without a rebuild.
 ENV FORWARDED_ALLOW_IPS="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,127.0.0.1"
+# The commit this image was built from (publish.yml passes it); /healthz reports it. Last, so it never
+# invalidates the layers above.
+ARG AMBER_SHA=dev
+ENV AMBER_SHA=$AMBER_SHA
 EXPOSE 8000
 # The slim image has no curl, so the check is Python's own urllib.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
