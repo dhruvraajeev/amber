@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import zlib
+from importlib.metadata import version
 
 import httpx
 from mcp.server.mcpserver import MCPServer
@@ -49,6 +50,11 @@ Kinds and params:
   Speed comes from profileId alone (one uncalibrated profile for now); the GPU sets only memory (how many
   requests fit in the KV cache at once) and price. So a faster GPU is not faster here: add replicas, raise
   maxBatchSize/maxBatchTokens, or enable speculative decoding.
+Numbers from a real codebase:
+- concurrencyPerReplica is requests truly running at once. CPU-bound Python threads share one core (the
+  GIL): use 1 per process and count processes/workers as replicas. Async I/O-bound servers can be high.
+- Use latencies measured under load, not on an idle machine; if you can't, say so.
+- If any node is over 80% busy, warn that its p99 is fragile: at 90% busy, +10% latency roughly doubles it.
 Users traffic and agent params describe the workload: to meet a target, change capacity (replicas, pools,
 batch sizes, cache hitRate) and keep the workload as asked unless told otherwise.
 Modeling tips:
@@ -76,6 +82,7 @@ Minimal example:
 
 server = MCPServer(
     "amber",
+    version=version("amber-mcp"),
     instructions="Amber simulates web and AI system designs: latency percentiles, errors, bottlenecks, "
     "and monthly cost. Start from list_templates, check with validate_design, then simulate.",
 )
@@ -136,12 +143,14 @@ def model_codebase(target: str = "the traffic it expects, with p99 under 500 ms"
    0 tools), so its prompt and output token sizes match what the code sends (e.g. max_tokens). Each
    endpoint with its own path gets its own users node (its share of the traffic) and service node, in
    one design. Edges follow who calls whom.
+   Python workers: count processes (gunicorn/uvicorn workers) as replicas, 1 concurrency each if CPU-bound.
 3. Where the code can't tell you a number (work latency, cache hit rate, calls per agent run), pick a
    sensible value, and list every such assumption for the user.
 4. Start from the closest list_templates design, validate_design until it is clean, then simulate.
 5. Report p50/p99, error rate, monthly cost, and the bottlenecks, each tied back to the file or setting
-   it comes from. If the target is missed, change capacity (replicas, pools, cache, batch sizes), simulate
-   again, and say which change in the codebase or deploy config each fix corresponds to.
+   it comes from. If a node is over 80% busy, say its p99 is sensitive to the latencies you assumed.
+   If the target is missed, change capacity (replicas, pools, cache, batch sizes), simulate again, and
+   say which change in the codebase or deploy config each fix corresponds to.
 6. End with the open_url of the final design so the user can see it in Amber's editor."""
 
 

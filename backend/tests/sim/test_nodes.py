@@ -154,6 +154,7 @@ def test_users_sends_the_profiles_arrivals_and_finishes_every_request():
     expected = 50 * 20  # rps × seconds
     assert abs(len(u.requests) - expected) <= 3 * math.sqrt(expected)
     assert stub.seen == [r.id for r in u.requests]  # ids are unique and in arrival order
+    assert u.served == len(u.requests)  # its throughput on the canvas is what it sends
     assert all(r.status == "ok" and round(r.end - r.created_at, 9) == 5 for r in u.requests)
     assert all(a.created_at <= b.created_at for a, b in zip(u.requests, u.requests[1:], strict=False))
 

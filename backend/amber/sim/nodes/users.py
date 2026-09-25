@@ -34,6 +34,7 @@ class Users(Node):
             now = self.env.now
             req = Request(f"{self.id}#{len(self.requests)}", now, now + timeout_ms)
             self.requests.append(req)
+            self.served += 1  # a users node's throughput is what it sends
             Process(self.env, self._serve(req))
 
     def _serve(self, req: Request) -> ProcessGen:

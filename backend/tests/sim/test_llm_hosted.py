@@ -48,6 +48,22 @@ def test_a_call_is_ttft_then_generation_and_costs_its_llm_tokens():
     assert node.rejects == 0
 
 
+def test_a_call_is_billed_when_admitted_even_if_the_run_ends_mid_stream():
+    env = Environment()
+    node = llm(env)
+    [req] = send(env, node, 1, run_until=100)  # the call takes 4400 ms; the run stops at 100
+    assert req.end is None
+    assert node.usd == pytest.approx(usd(1))
+
+
+def test_calls_admitted_before_bill_from_ms_are_not_billed():
+    env = Environment()
+    node = llm(env)
+    node.bill_from_ms = 1000  # warmup, as sim/run.py sets it
+    send_at(env, node, [0.0, 2000.0])
+    assert node.usd == pytest.approx(usd(1))
+
+
 def test_only_the_first_call_sets_first_token_and_explicit_sizes_are_billed():
     env = Environment()
     node = llm(env)

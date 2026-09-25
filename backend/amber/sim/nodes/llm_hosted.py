@@ -24,8 +24,12 @@ class HostedLlm(Node):
     A call that finds it empty gets a 429, backs off and retries up to `maxRetries` times, then the
     request fails as `rate_limited`. The span's `queue_ms` is that backoff time; `work_ms` is the call.
 
-    `usd` is what completed calls cost. `rejects` counts 429s, retried or not: for this node a reject is
-    a rate-limit hit, and the rate-limit rule in `sim/analysis.py` reads it that way.
+    `usd` is what calls admitted from `bill_from_ms` on cost, billed the moment a call gets its permit. That
+    measures the spend of the steady state, like the summary: a call still streaming when the run ends is
+    billed, and the empty first seconds (warmup, set by `sim/run.py`) are not.
+
+    `rejects` counts 429s, retried or not: for this node a reject is a rate-limit hit, and the rate-limit
+    rule in `sim/analysis.py` reads it that way.
     """
 
     def __init__(self, env: Environment, node: LlmNode, seed: int) -> None:
@@ -45,6 +49,7 @@ class HostedLlm(Node):
         self._tokens_rng = stream(seed, node.id, "tokens")
         self._retry_rng = stream(seed, node.id, "retry")
         self.usd = 0.0
+        self.bill_from_ms = 0.0
 
     def handle(self, req: Request) -> ProcessGen:
         """Called straight from a service: the preset's default prompt and output sizes (§8.5)."""
@@ -62,6 +67,9 @@ class HostedLlm(Node):
             yield Timeout(self.env, self.backoff_ms(attempt))
             attempt += 1
         backoff_ms = self.env.now - started_at
+        if self.env.now >= self.bill_from_ms:
+            usd_in, usd_out = self._usd_per_token
+            self.usd += prompt_tokens * usd_in + output_tokens * usd_out
 
         ttft_ms = self._work_rng.lognormvariate(*self._ttft)
         yield Timeout(self.env, ttft_ms)
@@ -71,8 +79,6 @@ class HostedLlm(Node):
         yield Timeout(self.env, generate_ms)
 
         self.record(req, backoff_ms, ttft_ms + generate_ms)
-        usd_in, usd_out = self._usd_per_token
-        self.usd += prompt_tokens * usd_in + output_tokens * usd_out
 
     def backoff_ms(self, attempt: int) -> float:
         """Wait before retry number `attempt` (0-based): exponential, capped, plus jitter."""

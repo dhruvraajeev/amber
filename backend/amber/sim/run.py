@@ -64,7 +64,7 @@ def simulate(
     With `wall_limit_s`, a run that takes longer than that in real time raises `kernel.SimTimeout`.
     """
     run = execute(design, config, work_samplers, wall_limit_s)
-    cost = monthly_cost(design, run.nodes, config.duration_s)
+    cost = monthly_cost(design, run.nodes, config.duration_s - billed_from_s(config))
     summary = run.metrics.summary()
     timeline = run.metrics.timeline()
     rows = attribution(run.metrics.answered(), summary.latency_ms.p99)
@@ -104,6 +104,9 @@ def execute(
             source.connect(target, edge.role)
         else:
             source.downstream.append(target)
+    for node in nodes.values():
+        if isinstance(node, HostedLlm):  # bill the same steady state the summary measures
+            node.bill_from_ms = billed_from_s(config) * 1000
     for node_id, sampler in (work_samplers or {}).items():
         nodes[node_id].sample_work = sampler  # type: ignore[attr-defined]
 
@@ -116,6 +119,12 @@ def execute(
     deadline = None if wall_limit_s is None else started_at + wall_limit_s
     env.run(config.duration_s * 1000, deadline)
     return Run(env, nodes, metrics, (time.perf_counter() - started_at) * 1000)
+
+
+def billed_from_s(config: RunConfig) -> float:
+    """When hosted LLM spend starts counting: after warmup, or from 0 if warmup covers the whole run (as
+    `Metrics.measured` does). The run starts empty, so an agent's calls ramp up over its first seconds."""
+    return config.warmup_s if config.warmup_s < config.duration_s else 0.0
 
 
 def build_node(env: Environment, node: DesignNode, seed: int) -> Node:
@@ -134,10 +143,8 @@ def design_hash(design: Design) -> str:
 def canonical_design(design: Design) -> str:
     """The design as canonical JSON: sorted keys, no whitespace, no positions, no absent fields.
 
-    It must match `canonicalDesign` in frontend/src/canvas/map.ts byte for byte, so the frontend and
-    the backend agree on whether two designs are the same one. Two Python-only wrinkles: fields that
-    are `None` here are simply absent in the frontend's object, so they are dropped, and a float that
-    happens to be whole is written as an integer, because that is what JavaScript prints.
+    Fields that are `None` are dropped, and a float that happens to be whole is written as an integer
+    (what JavaScript prints), so the hash doesn't depend on how the design was typed in.
     """
     body = design.model_dump(mode="json", by_alias=True, exclude_none=True)
     for node in body["nodes"]:
