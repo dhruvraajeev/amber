@@ -10,7 +10,7 @@ export default function EmptyState({ templates, offline, resume, onPick, onResum
   templates: Design[]; offline: boolean; resume?: string; onPick: (d: Design) => void; onResume: () => void
 }) {
   return (
-    <div className="panel h-full overflow-hidden">
+    <div className="panel h-full overflow-hidden bg-bg">
       <Embers className="pointer-events-none absolute inset-0 size-full opacity-60" />
       <div className="relative grid h-full place-items-center overflow-auto px-6 py-10">
         <div className="flex w-full max-w-4xl flex-col items-center">
