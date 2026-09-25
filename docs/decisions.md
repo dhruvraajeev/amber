@@ -124,3 +124,24 @@ Non-obvious choices, newest last. One entry: date — context → decision → w
 - 2026-09-25 — Step 23 inspector: "Timing profile" is a select with one option, `default`, listed in `LlmForm.tsx` because the backend's `PROFILES` lives in Python and `shared/profiles/` stays empty until Step 27. An unknown id from an imported design stays in the list, so the backend's 422 still has something to point at. Step 27 should read the list from `shared/profiles/`. The KV read-out and `validate.ts`'s does-not-fit check now share `lib/ai.ts`'s `kvBudget`, so the two can't disagree.
 - 2026-09-25 — Bottleneck rules: a self-hosted LLM's rejects get their own row, "{name} turned away {n} requests ({pct}%) too big for its KV cache. Use a bigger GPU or a smaller output reserve." §8.9's "Raise queueLimit or add capacity" was wrong advice there: an LLM has no queueLimit, and more replicas of the same GPU can't fit a call that doesn't fit one. It ranks with the other critical rows, after the plain reject row. Adding a row meant renumbering every `add(3, …)`-style call, so `RULES` is now a dict keyed by name (`"kv_rejects"`, `"headroom"`, …) whose insertion order is still §8.9's row order.
 - 2026-09-25 — Step 24a publish: the image is built for `linux/amd64` and `linux/arm64`. Azure pulls amd64. arm64 lets anyone on an Apple-silicon Mac `docker run` the published image natively instead of under emulation. The Dockerfile's UI stage uses `--platform=$BUILDPLATFORM`: its output is plain JS/CSS, so it builds once, natively. Only the Python stage runs under QEMU, and that stage only installs pure-Python wheels. Both architectures were checked locally and give byte-for-byte the same simulation numbers. Tags are the full commit sha (what 24b/24c deploy) plus `:latest` (for people running it locally). Authentication uses the built-in `GITHUB_TOKEN` with `packages: write`, so there are no secrets. The layer cache is GitHub's free Actions cache.
+- 2026-09-25 — Step 24b Azure deploy. Everything lives in the **Azure for Students** subscription (spending limit on). The same login also sees a Free Trial subscription, "Azure subscription 1", which is unused. Always pass `--subscription "Azure for Students"` or `az account set` to it first. Resources, all in `westus`:
+  - resource group `amber-rg`
+  - Container Apps environment `amber-env`: Consumption profile only, `--logs-destination none`
+  - container app `amber`: 0.5 vCPU / 1 GiB, 0–1 replicas, external ingress to port 8000
+  - image `ghcr.io/dhruvraajeev/amber:<full sha>`, public, so there are no registry flags
+  - URL: https://amber.victoriousrock-f5544b42.westus.azurecontainerapps.io
+
+  **Region:** the student subscription's policy allows only francecentral, canadacentral, norwayeast, westus and denmarkeast. Container Apps isn't offered in denmarkeast. West US is the closest allowed region to the owner (Texas).
+
+  **No log workspace:** by default the environment would create a Log Analytics workspace, which bills per GB ingested. With `--logs-destination none`, live logs still stream through `az containerapp logs show`, and telemetry comes in Step 31.
+
+  **Budget:** `amber-credit` sits on the billing account, not the subscription: $100 monthly, Actual alerts at 25/50/75/90%.
+
+  **CLI:** 2.90 has `containerapp` built in, so no extension is needed.
+
+  **Live checks (first image, 1722f2e):**
+  - `/`, `/compare`, `/api/templates` and `/api/presets` return 200.
+  - All 3 templates simulate (60 s runs, under 1 s round trip).
+  - An empty design returns 422 `NO_USERS`.
+  - A 600 s classic-web-app run (119k requests, near the 200k cap) finished in 4.3 s of server time, well inside the 20 s wall limit, so 0.5 vCPU is enough.
+  - `az resource list` shows only `amber-env` and `amber`, so no registry.
