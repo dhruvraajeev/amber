@@ -1,10 +1,11 @@
 """The self-hosted LLM node (plan §8.7): timing and KV math by hand, replica choice, the scheduler loop,
-and the admission check.
+the admission check, and speculative decoding.
 
 The loop tests swap in test-local admissions (admit everyone, one at a time, …) so each tests the loop
 alone; the admission tests at the end use the real `admit`, directly and through the scheduler.
 """
 
+import random
 from collections import deque
 from types import SimpleNamespace
 
@@ -21,13 +22,19 @@ from amber.sim.nodes.llm_selfhosted import (
     admit,
     kv_bytes_per_token,
     kv_capacity_bytes,
+    speculative_tokens,
 )
 from amber.sim.request import Request
 
 GB = 1e9
 
 
-def llm(env, replicas=1, reserve=512, max_batch_size=32, max_batch_tokens=4096):
+SPEC_OFF = {"enabled": False, "draft_tokens": 4, "acceptance_rate": 0.7, "draft_step_ms": 3}
+
+
+def llm(
+    env, replicas=1, reserve=512, max_batch_size=32, max_batch_tokens=4096, speculative=SPEC_OFF, seed=42
+):
     """Llama 3.1 8B FP16 on an L4, as in the agent-self-hosted template."""
     params = {
         "mode": "selfHosted",
@@ -38,12 +45,12 @@ def llm(env, replicas=1, reserve=512, max_batch_size=32, max_batch_tokens=4096):
         "max_batch_size": max_batch_size,
         "max_batch_tokens": max_batch_tokens,
         "max_output_tokens_reserve": reserve,
-        "speculative": {"enabled": False, "draft_tokens": 4, "acceptance_rate": 0.7, "draft_step_ms": 3},
+        "speculative": speculative,
     }
     node = NODE.validate_python(
         {"id": "llm", "kind": "llm", "label": "llm", "position": {"x": 0, "y": 0}, "params": params}
     )
-    return SelfHostedLlm(env, node, seed=42)
+    return SelfHostedLlm(env, node, seed=seed)
 
 
 def calls(node, n, prompt=100, output=10):
@@ -100,9 +107,9 @@ def test_kv_capacity_is_usable_gpu_memory_minus_weights():
 
 
 def test_kv_capacity_is_negative_when_the_model_does_not_fit():
-    # 16 GB × 0.9 = 14.4 GB < 16.1 GB of weights. Step 22 turns this into a PARAM_RANGE issue.
+    # T4: 16 GB × 0.9 = 14.4 GB < 16.1 GB of weights. sim/graph.py refuses this pair (PARAM_RANGE).
     llama = presets("models")["llama-3.1-8b-instruct-fp16"]
-    assert kv_capacity_bytes({"memoryGb": 16}, llama) == pytest.approx(-1.7 * GB)
+    assert kv_capacity_bytes(presets("gpus")["nvidia-t4-16gb"], llama) == pytest.approx(-1.7 * GB)
 
 
 def test_the_node_reads_its_presets():
@@ -335,12 +342,6 @@ def test_a_gpu_point_sums_the_replicas(monkeypatch):
     assert point.kv_pct == pytest.approx(3 * (100 + 512) * 131_072 / (2 * node.kv_capacity_bytes))
 
 
-def test_a_model_that_does_not_fit_reads_as_a_full_gpu():
-    node = llm(Environment())
-    node.kv_capacity_bytes = -1.7e9  # a 16 GB GPU for a 16.1 GB model; Step 22 refuses it up front
-    assert node.gpu_point(1.0).kv_pct == 1.0
-
-
 def test_with_the_real_admission_ttft_rises_with_queue_depth():
     """A burst larger than one batch: each later wave waits for KV and batch room, so the further
     back in line, the later the first token."""
@@ -433,3 +434,92 @@ def test_through_the_scheduler_the_limits_hold_at_every_step_and_nobody_is_dropp
     assert max(batch for batch, *_ in steps) == 4
     assert any(tokens > 2500 for _, _, tokens, *_ in steps)
     assert max(waiting for *_, waiting in steps) > 0
+
+
+# ── Speculative decoding (§8.7) ───────────────────────────────────────────────
+
+
+def spec(acceptance_rate, draft_tokens=4, draft_step_ms=3):
+    return {
+        "enabled": True,
+        "draft_tokens": draft_tokens,
+        "acceptance_rate": acceptance_rate,
+        "draft_step_ms": draft_step_ms,
+    }
+
+
+@pytest.mark.parametrize("alpha", [0.5, 0.8])
+@pytest.mark.parametrize("k", [2, 4])
+def test_speculative_tokens_average_the_closed_form(alpha, k):
+    rng = random.Random(7)
+    mean = sum(speculative_tokens(rng, k, alpha) for _ in range(200_000)) / 200_000
+    assert mean == pytest.approx((1 - alpha ** (k + 1)) / (1 - alpha), rel=0.01)
+
+
+def test_speculative_tokens_range_from_one_to_all_drafts_plus_one():
+    rng = random.Random(7)
+    assert {speculative_tokens(rng, 4, 0.0) for _ in range(1000)} == {1}  # every draft rejected
+    assert {speculative_tokens(rng, 4, 1.0) for _ in range(1000)} == {5}  # every draft accepted, + 1
+    assert {speculative_tokens(rng, 4, 0.5) for _ in range(1000)} == {1, 2, 3, 4, 5}
+
+
+def test_the_verify_factor_is_linear_in_the_draft_tokens():
+    assert PROFILES["default"].verify_factor(0) == 1
+    assert PROFILES["default"].verify_factor(4) == pytest.approx(1.4)  # c_v = 0.1 until calibrated
+
+
+def spec_served(monkeypatch, speculative, seed=42):
+    env = Environment()
+    monkeypatch.setattr(llm_selfhosted, "admit", admit_all)
+    node = llm(env, speculative=speculative, seed=seed)
+    node.profile = ROUND
+    return env, node
+
+
+def test_a_speculative_step_drafts_then_verifies_and_never_overshoots(monkeypatch):
+    env, node = spec_served(monkeypatch, spec(1.0, draft_tokens=4, draft_step_ms=3))
+    a = send(env, node, "a", 0, prompt=100, output=3)
+    env.run(10_000)
+    # Prefill 110 ms gives token 1 (no drafting in a prefill). Then one decode step: 4 drafts × 3 ms,
+    # plus the batch-of-one step (5 + 1) × verify factor 1.4 = 20.4 ms. It accepts all 4 drafts + 1,
+    # but the call wanted only 2 more tokens, so it is done after that single step.
+    assert first_tokens(a) == {"a": 110}
+    assert trail(a) == [("llm", 0.0, pytest.approx(130.4))]
+    assert node.replicas[0].kv_used == 0
+
+
+def test_every_sequence_ends_with_exactly_its_output_and_frees_its_kv(monkeypatch):
+    env, node = spec_served(monkeypatch, spec(0.8))
+    finished = []
+    finish = node._finish
+    monkeypatch.setattr(node, "_finish", lambda replica, seq: (finished.append(seq), finish(replica, seq)))
+    for i in range(40):
+        send(env, node, f"r{i}", i * 7, prompt=100, output=5 + i)
+    env.run(1_000_000)
+    assert len(finished) == 40
+    assert all(seq.generated == seq.output_tokens for seq in finished)
+    assert (node.replicas[0].kv_used, node.replicas[0].load) == (0, 0)
+
+
+def finish_time(monkeypatch, speculative, seed=42):
+    env, node = spec_served(monkeypatch, speculative, seed)
+    reqs = [send(env, node, f"r{i}", 0, prompt=100, output=200) for i in range(8)]
+    env.run(10_000_000)
+    return max(end for r in reqs for _, _, end in trail(r))
+
+
+def test_speculation_pays_off_only_when_drafts_are_accepted(monkeypatch):
+    # 8 calls share one 810 ms prefill, then decode 199 more tokens in a batch of 8. A plain step is
+    # 13 ms; a speculative one 12 + 13 × 1.4 = 30.2 ms. At α = 0.9, k = 4 a step yields
+    # (1 − 0.9⁵) / 0.1 ≈ 4.1 tokens, so decoding should take about 30.2 / 4.1 / 13 ≈ 0.57× as long.
+    prefill = 810
+    plain = finish_time(monkeypatch, SPEC_OFF) - prefill
+    assert plain == 199 * 13
+    assert 0.5 * plain < finish_time(monkeypatch, spec(0.9)) - prefill < 0.65 * plain
+    # At α = 0 every draft is thrown away: still 1 token a step, now for 30.2 ms instead of 13.
+    assert finish_time(monkeypatch, spec(0.0)) - prefill == pytest.approx(199 * 30.2)
+
+
+def test_speculation_is_deterministic_per_seed(monkeypatch):
+    assert finish_time(monkeypatch, spec(0.7)) == finish_time(monkeypatch, spec(0.7))
+    assert finish_time(monkeypatch, spec(0.7)) != finish_time(monkeypatch, spec(0.7), seed=43)

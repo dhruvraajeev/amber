@@ -158,6 +158,18 @@ const dist = (path: string, d: LatencyDist): Problem[] =>
 const known = (path: string, id: string, list: { id: string }[]): Problem[] =>
   list.some((p) => p.id === id) ? [] : [[path, `unknown preset "${id}".`]]
 
+// A self-hosted model needs its weights to leave room for the KV cache (§8.7; backend: kv_capacity_bytes).
+const GPU_MEMORY_UTILIZATION = 0.9
+
+function modelFits(gpuId: string, modelId: string): Problem[] {
+  const gpu = gpus.find((g) => g.id === gpuId)
+  const model = models.find((m) => m.id === modelId)
+  if (!gpu || !model) return [] // an unknown id is its own issue
+  const usable = gpu.memoryGb * GPU_MEMORY_UTILIZATION
+  return usable > model.weightsGb ? [] : [['gpuPresetId',
+    `the model does not fit on this GPU (${model.weightsGb} GB of weights, ${Number(usable.toFixed(2))} GB usable on the ${gpu.name}).`]]
+}
+
 function paramProblems(node: DesignNode): Problem[] {
   switch (node.kind) {
     case 'users': {
@@ -224,6 +236,7 @@ function paramProblems(node: DesignNode): Problem[] {
       return [
         ...known('gpuPresetId', p.gpuPresetId, gpus),
         ...known('modelPresetId', p.modelPresetId, models),
+        ...modelFits(p.gpuPresetId, p.modelPresetId),
         ...(p.profileId ? [] : [['profileId', 'profileId is required.'] as Problem]),
         ...within('replicas', p.replicas, 1, 50, true),
         ...within('maxBatchSize', p.maxBatchSize, 1, Infinity, true),

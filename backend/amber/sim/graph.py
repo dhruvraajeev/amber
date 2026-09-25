@@ -13,7 +13,7 @@ from pydantic import TypeAdapter, ValidationError
 from amber.contracts import Design, RunConfig, TrafficProfile, ValidationIssue
 from amber.presets import presets
 from amber.sim.arrivals import expected_requests, peak
-from amber.sim.nodes.llm_selfhosted import PROFILES
+from amber.sim.nodes.llm_selfhosted import GPU_MEMORY_UTILIZATION, PROFILES, kv_capacity_bytes
 
 MAX_NODES = 50
 MAX_EDGES = 100
@@ -144,6 +144,8 @@ def validate(design: object, config: object = None) -> list[ValidationIssue]:
                 node_id=node["id"],
                 path=path,
             )
+        if message := _model_does_not_fit(node):
+            add("PARAM_RANGE", f"{node['label']}: {message}", node_id=node["id"], path="params.gpuPresetId")
 
     # Users nodes whose traffic breaks a field range are already PARAM_RANGE; they add nothing here.
     traffic = [t for t in map(_parsed_traffic, users) if t is not None]
@@ -275,6 +277,25 @@ def _unknown_presets(node: dict) -> list[tuple[str, str]]:
         for (mode, field), known in PRESET_FIELDS.items()
         if params.get("mode") == mode and isinstance(params.get(field), str) and params[field] not in known()
     ]
+
+
+def _model_does_not_fit(node: dict) -> str | None:
+    """Why a self-hosted LLM's model can't load on its GPU, or None when it can (or the ids are unknown,
+    which `_unknown_presets` already reports). Without KV-cache room no call could ever be admitted."""
+    params = node.get("params")
+    if node["kind"] != "llm" or not isinstance(params, dict) or params.get("mode") != "selfHosted":
+        return None
+    gpu_id, model_id = params.get("gpuPresetId"), params.get("modelPresetId")
+    if not isinstance(gpu_id, str) or not isinstance(model_id, str):
+        return None  # malformed JSON: already a field error
+    gpu, model = presets("gpus").get(gpu_id), presets("models").get(model_id)
+    if gpu is None or model is None or kv_capacity_bytes(gpu, model) > 0:
+        return None
+    usable = gpu["memoryGb"] * GPU_MEMORY_UTILIZATION
+    return (
+        f"the model does not fit on this GPU ({model['weightsGb']:g} GB of weights, "
+        f"{usable:g} GB usable on the {gpu['name']})."
+    )
 
 
 def _parsed_traffic(users_node: dict) -> TrafficProfile | None:

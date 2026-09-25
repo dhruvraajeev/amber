@@ -1,6 +1,7 @@
 [
-  { "id": "nvidia-l4-24gb", "name": "NVIDIA L4", "memoryGb": 24, "usdPerHour": 0.8, "verifiedAt": null, "note": "approximate on-demand cloud price; verify" },
-  { "id": "nvidia-a10g-24gb", "name": "NVIDIA A10G", "memoryGb": 24, "usdPerHour": 1.0, "verifiedAt": null, "note": "approximate on-demand cloud price; verify" },
-  { "id": "nvidia-a100-80gb", "name": "NVIDIA A100 80GB", "memoryGb": 80, "usdPerHour": 3.7, "verifiedAt": null, "note": "approximate on-demand cloud price; verify" },
-  { "id": "nvidia-h100-80gb", "name": "NVIDIA H100 80GB", "memoryGb": 80, "usdPerHour": 6.9, "verifiedAt": null, "note": "approximate on-demand cloud price; verify" }
+  { "id": "nvidia-t4-16gb", "name": "NVIDIA T4", "memoryGb": 16, "usdPerHour": 0.53, "verifiedAt": "2026-09-24", "note": "AWS on-demand, Linux, us-east-1: g4dn.xlarge (1× T4) $0.526/h (instances.vantage.sh)" },
+  { "id": "nvidia-l4-24gb", "name": "NVIDIA L4", "memoryGb": 24, "usdPerHour": 0.8, "verifiedAt": "2026-09-24", "note": "AWS on-demand, Linux, us-east-1: g6.xlarge (1× L4) $0.8048/h (instances.vantage.sh)" },
+  { "id": "nvidia-a10g-24gb", "name": "NVIDIA A10G", "memoryGb": 24, "usdPerHour": 1.01, "verifiedAt": "2026-09-24", "note": "AWS on-demand, Linux, us-east-1: g5.xlarge (1× A10G) $1.006/h (instances.vantage.sh)" },
+  { "id": "nvidia-a100-80gb", "name": "NVIDIA A100 80GB", "memoryGb": 80, "usdPerHour": 3.43, "verifiedAt": "2026-09-24", "note": "AWS on-demand, Linux, us-east-1: p4de.24xlarge (8× A100 80GB) $27.447/h ÷ 8 (instances.vantage.sh)" },
+  { "id": "nvidia-h100-80gb", "name": "NVIDIA H100 80GB", "memoryGb": 80, "usdPerHour": 6.88, "verifiedAt": "2026-09-24", "note": "AWS on-demand, Linux, us-east-1: p5.48xlarge (8× H100) $55.04/h ÷ 8 (instances.vantage.sh)" }
 ]

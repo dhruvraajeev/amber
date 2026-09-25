@@ -101,6 +101,26 @@ def test_unknown_preset_is_a_param_range_on_the_id_field():
     assert (issue.code, issue.path) == ("PARAM_RANGE", "params.presetId")
 
 
+def test_a_self_hosted_model_too_big_for_its_gpu_is_a_param_range_on_the_gpu_field():
+    """Same words as the frontend (validate.test.ts), so the inspector shows one message either way."""
+    design = load(SHARED / "fixtures" / "graph" / "model-does-not-fit.json")["design"]
+    [issue] = validate(design)
+    assert (issue.code, issue.node_id, issue.path) == ("PARAM_RANGE", "llm", "params.gpuPresetId")
+    assert issue.message == (
+        "LLM: the model does not fit on this GPU (16.1 GB of weights, 14.4 GB usable on the NVIDIA T4)."
+    )
+    node(design, "llm")["params"]["modelPresetId"] = "llama-3.1-8b-instruct-q4km"  # 4.9 GB fits
+    assert validate(design) == []
+
+
+def test_an_unknown_gpu_is_reported_once_not_also_as_does_not_fit():
+    design = load(SHARED / "fixtures" / "graph" / "model-does-not-fit.json")["design"]
+    node(design, "llm")["params"]["gpuPresetId"] = "no-such-gpu"
+    assert [i.message for i in validate(design)] == ['LLM: unknown preset "no-such-gpu".']
+    node(design, "llm")["params"]["gpuPresetId"] = ["not", "a", "string"]  # malformed JSON doesn't crash
+    assert codes(design) == ["PARAM_RANGE"]
+
+
 def test_limit_duration_points_at_the_config_field():
     [issue] = validate(valid_design(), {**CONFIG, "durationS": 5})
     assert (issue.code, issue.path) == ("LIMIT_DURATION", "config.durationS")

@@ -2,6 +2,7 @@
 
 import copy
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -46,9 +47,10 @@ def test_python_fields_are_snake_case_json_is_camel_case():
 
 @pytest.mark.parametrize("path", FIXTURES, ids=lambda p: p.stem)
 def test_graph_fixtures_parse_unless_they_break_a_field_range(path):
-    """Structural problems (cycles, bad edges, limits) are graph.py's job, so those designs still parse."""
+    """Structural problems (cycles, bad edges, limits) are graph.py's job, so those designs still parse.
+    So are checks that read the preset files: a model too big for its GPU is in range field by field."""
     fixture = load(path)
-    if "PARAM_RANGE" in fixture["expect"]:
+    if "PARAM_RANGE" in fixture["expect"] and path.stem != "model-does-not-fit":
         with pytest.raises(ValidationError):
             Design.model_validate(fixture["design"])
     else:
@@ -196,10 +198,11 @@ def test_run_result_optional_fields_round_trip():
 
 # The preset files have no Pydantic model: the forms read them as they are. These are their invariants.
 @pytest.mark.parametrize("path", sorted((SHARED / "presets").glob("*.json")), ids=lambda p: p.stem)
-def test_presets_have_unique_ids_and_unverified_prices(path):
+def test_presets_have_unique_ids_and_honest_verification(path):
     presets = load(path)
     assert presets and len({p["id"] for p in presets}) == len(presets)
-    assert all(p["verifiedAt"] is None for p in presets)  # set only once someone checks the prices
+    for p in presets:  # a date only once someone checked the values, and the note says against what
+        assert p["verifiedAt"] is None or (date.fromisoformat(p["verifiedAt"]) and p["note"])
 
 
 def test_database_presets_are_a_known_kind():

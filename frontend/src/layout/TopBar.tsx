@@ -88,6 +88,7 @@ const ASSUMPTIONS = [
   'Network time is not modeled separately; fold it into each latency setting.',
   'Self-hosted LLMs never preempt a request once admitted; requests that don’t fit wait.',
   'Prefill and decode times grow linearly with tokens and batch size.',
+  'Speculative decoding accepts each draft token independently at a fixed rate; real acceptance varies with the text.',
   'Hosted LLM APIs have unlimited concurrency; only their rate limit turns requests away.',
   'Results cover requests that arrive after warmup; any still running when the run ends have no latency yet.',
   'Monthly cost assumes the simulated traffic pattern repeats all month.',

@@ -1,11 +1,11 @@
 [
   { "id": "llama-3.1-8b-instruct-fp16", "name": "Llama 3.1 8B Instruct (FP16)",
     "nLayers": 32, "nKvHeads": 8, "headDim": 128, "bytesPerElement": 2, "weightsGb": 16.1,
-    "defaultPromptTokens": 512, "defaultOutputTokens": 256, "verifiedAt": null, "note": "verify config values" },
+    "defaultPromptTokens": 512, "defaultOutputTokens": 256, "verifiedAt": "2026-09-24", "note": "config.json (32 layers, 8 KV heads, head_dim 128) and 16.06 GB of BF16 safetensors, huggingface.co/unsloth/Llama-3.1-8B-Instruct (ungated copy of meta-llama's)" },
   { "id": "llama-3.1-8b-instruct-q4km", "name": "Llama 3.1 8B Instruct (Q4_K_M GGUF)",
     "nLayers": 32, "nKvHeads": 8, "headDim": 128, "bytesPerElement": 2, "weightsGb": 4.9,
-    "defaultPromptTokens": 512, "defaultOutputTokens": 256, "verifiedAt": null, "note": "weights quantized, KV cache FP16; verify" },
+    "defaultPromptTokens": 512, "defaultOutputTokens": 256, "verifiedAt": "2026-09-24", "note": "weights quantized (4.92 GB, bartowski/Meta-Llama-3.1-8B-Instruct-GGUF), KV cache FP16; config as the FP16 row" },
   { "id": "qwen2.5-7b-instruct-fp16", "name": "Qwen2.5 7B Instruct (FP16)",
     "nLayers": 28, "nKvHeads": 4, "headDim": 128, "bytesPerElement": 2, "weightsGb": 15.2,
-    "defaultPromptTokens": 512, "defaultOutputTokens": 256, "verifiedAt": null, "note": "verify config values" }
+    "defaultPromptTokens": 512, "defaultOutputTokens": 256, "verifiedAt": "2026-09-24", "note": "config.json (28 layers, 4 KV heads, 3584 / 28 heads = head_dim 128) and 15.23 GB of BF16 safetensors, huggingface.co/Qwen/Qwen2.5-7B-Instruct" }
 ]

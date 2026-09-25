@@ -2,9 +2,10 @@
 
 Pieces, top to bottom: the timing model and the KV-cache math, the admission check, a replica (one GPU
 server with its waiting line and running batch), and the node, which picks a replica per call and runs
-one scheduler per replica. Speculative decoding is Step 22.
+one scheduler per replica, optionally with speculative decoding.
 """
 
+import random
 from collections import deque
 from dataclasses import dataclass
 
@@ -13,6 +14,7 @@ from amber.presets import presets
 from amber.sim.kernel import Environment, Event, Process, ProcessGen, Timeout
 from amber.sim.nodes import Node
 from amber.sim.request import Request
+from amber.sim.rng import stream
 
 GPU_MEMORY_UTILIZATION = 0.9  # share of GPU memory the server may use, vLLM's default (§8.7)
 
@@ -22,13 +24,15 @@ class TimingProfile:
     """How long one scheduler step takes on the GPU, linear in its size (§8.7, Appendix B).
 
     Prefill reads the prompts of newly admitted requests in one pass; a decode step adds one token to
-    every running sequence. Both have a fixed cost per step plus a cost per unit of work.
+    every running sequence. Both have a fixed cost per step plus a cost per unit of work. With
+    speculative decoding, the big model's step also checks the draft tokens, which makes it dearer.
     """
 
     prefill_base_ms: float  # a_p
     prefill_ms_per_token: float  # b_p
     decode_base_ms: float  # a_d
     decode_ms_per_sequence: float  # b_d
+    verify_cost_per_draft_token: float = 0.1  # c_v, §8.7's default until Step 27 calibrates it
 
     def prefill_ms(self, tokens: int) -> float:
         """`a_p + b_p · tokens`: one prefill pass over this many prompt tokens."""
@@ -37,6 +41,10 @@ class TimingProfile:
     def decode_step_ms(self, batch: int) -> float:
         """`a_d + b_d · batch`: one decode step for a batch of this many sequences."""
         return self.decode_base_ms + self.decode_ms_per_sequence * batch
+
+    def verify_factor(self, draft_tokens: int) -> float:
+        """`1 + c_v · k`: how much dearer a decode step is when it also checks `k` draft tokens."""
+        return 1 + self.verify_cost_per_draft_token * draft_tokens
 
 
 # ponytail: one uncalibrated profile until Step 27 measures real ones into shared/profiles/.
@@ -57,9 +65,21 @@ def kv_bytes_per_token(model: dict) -> int:
 def kv_capacity_bytes(gpu: dict, model: dict) -> float:
     """GPU memory left for the KV cache once the weights are loaded.
 
-    Negative when the model doesn't fit; Step 22 reports that as a `PARAM_RANGE` issue.
+    ≤ 0 when the model doesn't fit; `sim/graph.py` refuses that design (`PARAM_RANGE`), so a running
+    node always has room.
     """
     return gpu["memoryGb"] * 1e9 * GPU_MEMORY_UTILIZATION - model["weightsGb"] * 1e9
+
+
+def speculative_tokens(rng: random.Random, draft_tokens: int, acceptance_rate: float) -> int:
+    """Tokens one sequence gains from one speculative step (§8.7): the draft tokens the big model
+    accepts in a row, each with probability `acceptance_rate`, up to `draft_tokens`, plus the one token
+    the big model always adds itself. Mean `(1 − α^(k+1)) / (1 − α)`.
+    """
+    accepted = 0
+    while accepted < draft_tokens and rng.random() < acceptance_rate:
+        accepted += 1
+    return accepted + 1
 
 
 @dataclass(slots=True, eq=False)
@@ -181,6 +201,8 @@ class SelfHostedLlm(Node):
         self.max_output_tokens_reserve = p.max_output_tokens_reserve
         self.max_batch_size = p.max_batch_size
         self.max_batch_tokens = p.max_batch_tokens
+        self.speculative = p.speculative if p.speculative.enabled else None
+        self._accept_rng = stream(seed, node.id, "accept")
         self.replicas = [Replica(env, p.max_batch_size) for _ in range(p.replicas)]
         self.resources = self.replicas  # utilization and queue length, as for a service
         for replica in self.replicas:
@@ -211,11 +233,9 @@ class SelfHostedLlm(Node):
 
     def gpu_point(self, t: float) -> GpuPoint:
         """The node right now, across its replicas: the share of KV reserved, the batch, the line."""
-        kv_total = self.kv_capacity_bytes * len(self.replicas)
         return GpuPoint(
             t=t,
-            # A model that doesn't fit has no KV at all; Step 22 makes that a validation issue.
-            kv_pct=sum(r.kv_used for r in self.replicas) / kv_total if kv_total > 0 else 1.0,
+            kv_pct=sum(r.kv_used for r in self.replicas) / (self.kv_capacity_bytes * len(self.replicas)),
             batch=sum(len(r.running) for r in self.replicas),
             waiting=sum(len(r.waiting) for r in self.replicas),
         )
@@ -224,9 +244,9 @@ class SelfHostedLlm(Node):
         """One replica's scheduler, one step per loop, forever (§8.7). Sleeps while it has no work.
 
         A step prefills the sequences admitted at its start and, in the same pass, adds one token to
-        every sequence already running. The admitted join the batch at once (they hold KV from now
-        on). At the end of the step they have their first token, and any sequence with all its output
-        is done and frees its KV.
+        every sequence already running (or, with speculative decoding, however many it accepts). The
+        admitted join the batch at once (they hold KV from now on). At the end of the step they have
+        their first token, and any sequence with all its output is done and frees its KV.
         """
         while True:
             if not replica.load:
@@ -256,7 +276,7 @@ class SelfHostedLlm(Node):
             if admitted:
                 step_ms += self.profile.prefill_ms(sum(seq.prompt_tokens for seq in admitted))
             if decoding:
-                step_ms += self.profile.decode_step_ms(len(decoding))
+                step_ms += self._decode_ms(len(decoding))
             yield Timeout(self.env, step_ms)
 
             for seq in admitted:
@@ -264,16 +284,33 @@ class SelfHostedLlm(Node):
                     seq.req.first_token_at = self.env.now
             still_running = []
             for seq in replica.running:
-                seq.generated += 1
+                # A prefill yields exactly the first token; a decode step may yield several, never
+                # more than the call asked for.
+                gained = self._decode_tokens() if seq.generated else 1
+                seq.generated = min(seq.generated + gained, seq.output_tokens)
                 if seq.generated >= seq.output_tokens:
                     self._finish(replica, seq)
                 else:
                     still_running.append(seq)
             replica.set_running(still_running)
 
+    def _decode_ms(self, batch: int) -> float:
+        """One decode step for `batch` sequences. Speculative: the small model drafts `k` tokens one at
+        a time, then the big model checks them all in one step that costs `verify_factor(k)` times more."""
+        step_ms = self.profile.decode_step_ms(batch)
+        if spec := self.speculative:
+            k = spec.draft_tokens
+            step_ms = k * spec.draft_step_ms + step_ms * self.profile.verify_factor(k)
+        return step_ms
+
+    def _decode_tokens(self) -> int:
+        if spec := self.speculative:
+            return speculative_tokens(self._accept_rng, spec.draft_tokens, spec.acceptance_rate)
+        return 1
+
     def _finish(self, replica: Replica, seq: Sequence) -> None:
         """The one way out of the batch: free the sequence's KV and hand its caller back control.
-        Step 22 (or anything that cancels a sequence) must leave through here too."""
+        Anything that ever cancels a sequence must leave through here too."""
         replica.kv_used -= seq.kv_bytes
         seq.done.succeed()
 

@@ -78,14 +78,11 @@ downstream before it continues.
 | **Database** | A connection pool with a waiting line, then the query time. Nothing downstream. |
 | **Agent** | Makes `1 + Poisson(llmCallsMean − 1)` LLM calls per request, so always at least one. Call *i* (counting from 0) sends `basePromptTokens + i × contextGrowthTokensPerStep` prompt tokens, because every step re-sends the conversation so far; that growth is where an agent's cost comes from. Between two LLM calls, never after the last, it makes `toolCallsPerStep` tool calls one after another: to its tool edges round robin (starting over with each request), or, with no tool edges, a `toolLatency` wait. Its own span is that wait time. No capacity limit of its own: it runs in its caller's slot. |
 | **Hosted LLM** | Waits for the first token, then streams the rest at a sampled tokens-per-second. A bucket of rate-limit permits refills continuously; a call that finds it empty gets a 429, backs off (`500 × 2^attempt` ms, capped at 8 s, plus jitter) and retries, and after the last retry the request fails as `rate_limited`. Cost accrues per prompt and output token. |
-| **Self-hosted LLM** | Your own GPUs running continuous batching, like vLLM. Each call joins the line of the replica with the fewest calls waiting or running. Each replica runs one step at a time: it reads the prompts of the calls it just let in (prefill, `a_p + b_p × tokens` ms) and, in the same pass, adds one token to every call already in the batch (decode, `a_d + b_d × batch` ms). A call gets its first token at the end of the step that let it in, and leaves once it has all its output tokens. Letting a call in reserves KV-cache memory for its prompt plus `maxOutputTokensReserve` (a server can't know the real answer length in advance), freed when it leaves. Calls are let in strictly in line order, while three limits hold: `maxBatchSize` calls in the batch, the KV reserved fits in the GPU memory left after the weights (90% of it is usable), and the prompts read in one step fit `maxBatchTokens`, except that one oversized prompt may go alone. A call that doesn't fit waits; one that couldn't fit even an empty GPU is rejected. The timing comes from a profile: until Part 2 measures real hardware there is one, `default`, an uncalibrated guess at Llama 3.1 8B FP16 on an L4. |
+| **Self-hosted LLM** | Your own GPUs running continuous batching, like vLLM. Each call joins the line of the replica with the fewest calls waiting or running. Each replica runs one step at a time: it reads the prompts of the calls it just let in (prefill, `a_p + b_p × tokens` ms) and, in the same pass, adds one token to every call already in the batch (decode, `a_d + b_d × batch` ms). A call gets its first token at the end of the step that let it in, and leaves once it has all its output tokens. Letting a call in reserves KV-cache memory for its prompt plus `maxOutputTokensReserve` (a server can't know the real answer length in advance), freed when it leaves. Calls are let in strictly in line order, while three limits hold: `maxBatchSize` calls in the batch, the KV reserved fits in the GPU memory left after the weights (90% of it is usable), and the prompts read in one step fit `maxBatchTokens`, except that one oversized prompt may go alone. A call that doesn't fit waits; one that couldn't fit even an empty GPU is rejected. A model too big for its GPU (no memory left for the KV cache) is refused before the run, as a validation issue. The timing comes from a profile: until Part 2 measures real hardware there is one, `default`, an uncalibrated guess at Llama 3.1 8B FP16 on an L4. With **speculative decoding** on, a small draft model guesses `draftTokens` tokens (`draftStepMs` each) and the big model checks them in one decode step that costs `1 + c_v × draftTokens` times more (`c_v = 0.1` until calibrated). Each call keeps the guesses up to the first wrong one, each accepted with probability `acceptanceRate`, plus the one token the big model adds itself: on average `(1 − α^(k+1)) / (1 − α)` tokens a step, never more than the call still needs. It pays off only when enough guesses are accepted. |
 
 Errors are statuses, not exceptions. A node that fails a request sets its status and returns; every
 caller checks, stops its remaining downstream calls, releases what it is holding, and returns too. A
 request keeps the first error that happened to it.
-
-*Not yet built:* speculative decoding for self-hosted LLMs (Step 22). The setting is accepted and
-ignored until then.
 
 ## Measurement (`sim/metrics.py`)
 
@@ -155,9 +152,11 @@ All of these are deliberate. They are listed in the app under "Model assumptions
 5. **No preemption for self-hosted LLMs.** Once a request is admitted it keeps its KV cache; requests
    that don't fit wait. Real vLLM pages and preempts.
 6. **Linear prefill and decode timing.** Both grow linearly with tokens and batch size.
-7. **Hosted APIs have unlimited concurrency.** Only the rate limit turns requests away.
-8. **Monthly cost is extrapolated** from the simulated window, as if that traffic ran all month.
-9. **One queue discipline: FIFO.** No priorities, no retries between your own services, no circuit
+7. **Speculative acceptance is a fixed coin flip.** Each draft token is accepted independently at
+   `acceptanceRate`; real acceptance varies with the text being written.
+8. **Hosted APIs have unlimited concurrency.** Only the rate limit turns requests away.
+9. **Monthly cost is extrapolated** from the simulated window, as if that traffic ran all month.
+10. **One queue discipline: FIFO.** No priorities, no retries between your own services, no circuit
    breakers.
-10. **The run stops at its duration.** Requests still running then have no outcome and no latency,
+11. **The run stops at its duration.** Requests still running then have no outcome and no latency,
     so the summary leaves them out of the percentiles (it reports how many there were).

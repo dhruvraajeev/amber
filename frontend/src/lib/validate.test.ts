@@ -28,6 +28,18 @@ describe('validate', () => {
     expect(validate(f.design)).toEqual([expect.objectContaining({ code: 'PARAM_RANGE', nodeId: 'api', path: 'params.work' })])
   })
 
+  it('refuses a self-hosted model too big for its GPU, with the same words as the backend', () => {
+    const f = Object.entries(fixtures).find(([file]) => file.endsWith('model-does-not-fit.json'))![1]
+    expect(validate(f.design)).toEqual([{
+      code: 'PARAM_RANGE', nodeId: 'llm', path: 'params.gpuPresetId',
+      message: 'LLM: the model does not fit on this GPU (16.1 GB of weights, 14.4 GB usable on the NVIDIA T4).',
+    }])
+    const q4 = structuredClone(f.design)
+    const llm = q4.nodes.find((n) => n.id === 'llm')!
+    if (llm.kind === 'llm' && llm.params.mode === 'selfHosted') llm.params.modelPresetId = 'llama-3.1-8b-instruct-q4km'
+    expect(validate(q4)).toEqual([]) // 4.9 GB of quantized weights fit
+  })
+
   it('treats an emptied number field (NaN) as out of range', () => {
     const f = Object.entries(fixtures).find(([file]) => file.endsWith('valid.json'))![1]
     const d = structuredClone(f.design)
