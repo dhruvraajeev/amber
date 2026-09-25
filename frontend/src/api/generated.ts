@@ -13,8 +13,8 @@ export interface paths {
         };
         /**
          * Healthz
-         * @description Liveness, and which commit is running: the published image carries its git sha (AMBER_SHA), so a
-         *     redeploy can be confirmed from outside. `async` so it answers even while simulations fill the threads.
+         * @description The commit that is running: the published image carries its git sha (AMBER_SHA), so a redeploy can
+         *     be confirmed from outside. `async` so it answers even while simulations fill the threads.
          */
         get: operations["healthz_healthz_get"];
         put?: never;

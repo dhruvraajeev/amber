@@ -1,7 +1,6 @@
 """The HTTP API (plan §9): what each endpoint answers, and the shape of every error."""
 
 import json
-from importlib.metadata import version
 
 from fastapi.testclient import TestClient
 
@@ -25,7 +24,7 @@ def without_wall_fields(result: dict) -> dict:
 
 
 def test_healthz(client):
-    assert client.get("/healthz").json() == {"status": "ok", "version": version("amber"), "sha": "dev"}
+    assert client.get("/healthz").json() == {"sha": "dev"}
 
 
 def test_presets_are_the_shared_files_under_the_frontends_names(client):

@@ -28,7 +28,7 @@ def test_files_are_served_and_missing_files_stay_404(spa):
 
 
 def test_api_and_health_still_answer_as_json(spa):
-    assert spa.get("/healthz").json()["status"] == "ok"
+    assert spa.get("/healthz").json() == {"sha": "dev"}
     assert spa.get("/api/nope").json() == {"error": "not_found", "detail": "Not Found"}
     assert spa.post("/api/nope").status_code == 404
     assert spa.get("/api/simulate").json()["error"] == "method_not_allowed"  # POST-only route

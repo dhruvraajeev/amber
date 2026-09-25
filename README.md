@@ -240,7 +240,7 @@ Short version: **the simulator's math is right; the answer is only as good as th
 | **Queueing math** | Against textbook systems with exact answers (`backend/tests/sim/test_queueing_theory.py`) | Within 1% |
 | **Cost arithmetic** | Against the exact formula, over hundreds of runs | Flat prices are exact. Hosted-LLM token cost is within 2.5%, even for 30-second runs |
 | **A real running system** | Amber predicted its own API, which was then load-tested for real | Close when set up right, far off when set up wrong (below) |
-| **GPU serving** | Not yet: one rough timing profile | An informed estimate until v1.1 |
+| **GPU serving** | Not yet: one rough timing profile | An informed estimate until it's calibrated |
 
 **The textbook checks** (100 runs × 600 s each):
 
@@ -275,7 +275,7 @@ error in p99. Same system, 90% busy, service time nudged up:
 **LLM serving is not calibrated yet.** Self-hosted GPU timing comes from one rough profile (Llama 3.1
 8B FP16 on an L4), and presets carry prices marked "verify." Treat AI latency and cost figures as
 informed estimates. **Calibration against real hardware (llama.cpp benchmarks, with the measured error
-published here) is coming in v1.1.**
+published here) is next.**
 
 ## Limitations
 
@@ -290,9 +290,9 @@ Amber is a model, not a benchmark, and it simplifies on purpose. The same list i
 - Self-hosted LLMs never preempt an admitted request, and prefill and decode times are linear in
   tokens and batch size. Speculative decoding accepts each draft token at a fixed rate.
 - A self-hosted LLM's decode step doesn't get slower as conversations get longer yet, so long-context
-  agents look faster than they are (v1.1).
+  agents look faster than they are (fixed by calibration).
 - GPU memory doesn't set aside room for the model's working memory (activations) yet, so a GPU fits a
-  few more requests than it really would (v1.1).
+  few more requests than it really would (fixed by calibration).
 - Hosted LLM APIs have unlimited concurrency apart from their rate limit.
 - Monthly cost assumes the simulated window repeats all month.
 - The public instance limits runs to 600 simulated seconds, 5,000 requests/second, about 200,000
@@ -383,9 +383,9 @@ TypeScript types. CI fails if you forget.
 
 ## Roadmap
 
-- **v1.1:** calibration. Benchmark llama.cpp on real hardware, fit the GPU timing model, and publish
+- **Next: calibration.** Benchmark llama.cpp on real hardware, fit the GPU timing model, and publish
   the simulator's measured error.
-- **v1.2:** hosted-API calibration, saved designs with share links, push-to-deploy, OpenTelemetry
+- **Later:** hosted-API calibration, saved designs with share links, push-to-deploy, OpenTelemetry
   traces, and an accessibility pass.
 
 ## License
