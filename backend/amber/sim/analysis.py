@@ -109,6 +109,13 @@ def bottlenecks(
         else:
             add("attribution", top.node_id, share=_pct(top.work_share), doing="working in")
 
+    if summary.requests and not summary.completed:
+        # Every node can look calm while each request is still in flight: without this, "p99 is 0 ms".
+        message = (
+            f"None of the {summary.requests} requests finished within the run. Add capacity or run longer."
+        )
+        found.append((-1, Bottleneck(severity="critical", message=message)))
+
     if not found:
         p99 = round(summary.latency_ms.p99)
         return [Bottleneck(severity="info", message=f"No bottlenecks at this traffic. p99 is {p99} ms.")]

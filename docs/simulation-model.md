@@ -119,8 +119,8 @@ node's share of that time, split into waiting and working. It answers "when it's
 time going?" rather than "what is the average".
 
 **Bottlenecks** are a short ordered list of plain-English findings with numbers in them: a node above
-90% busy, a queue that keeps growing, rejections, rate-limit hits, a GPU out of KV cache, or — when
-none of that is true — a line saying so and quoting the p99. At most five, most severe first.
+90% busy, a queue that keeps growing, rejections, rate-limit hits, a GPU out of KV cache, no request
+finishing within the run at all, or — when none of that is true — a line saying so and quoting the p99. At most five, most severe first.
 
 **Cost** is monthly. Services, caches and databases carry flat prices; self-hosted GPUs are
 `replicas × $/hour × 730`. A hosted LLM is different, because it bills per token: what the calls

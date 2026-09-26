@@ -162,6 +162,12 @@ def test_nothing_triggered_reports_the_p99():
     assert run(s=summary(p99=212.4)) == [("info", None, "No bottlenecks at this traffic. p99 is 212 ms.")]
 
 
+def test_no_request_finishing_is_critical_even_when_every_node_looks_calm():
+    stuck = summary(requests=34, p99=0).model_copy(update={"completed": 0})
+    message = "None of the 34 requests finished within the run. Add capacity or run longer."
+    assert run(s=stuck) == [("critical", None, message)]
+
+
 # ── Ranking ──────────────────────────────────────────────────────────────────
 
 
