@@ -1,0 +1,36 @@
+{
+  "id": "llama-3.1-8b-q4km-m4pro",
+  "name": "Meta-Llama-3.1-8B-Instruct-Q4_K_M on Apple M4 Pro (measured 2026-09-26)",
+  "prefillBaseMs": 0.0,
+  "prefillMsPerToken": 2.86146,
+  "decodeBaseMs": 0.0,
+  "decodeMsPerSequence": 23.442115,
+  "verifyCostPerDraftToken": 0.330153,
+  "fit": {
+    "prefill": {
+      "r2": 0.9978,
+      "samples": 9
+    },
+    "decode": {
+      "r2": 0.9927,
+      "samples": 45
+    },
+    "verify": {
+      "r2": 0.5605,
+      "samples": 9,
+      "stepBaseMs": 80.3603,
+      "decode1Ms": 23.4421
+    }
+  },
+  "speculative": {
+    "draftStepMs": 4.6857,
+    "acceptanceRate": 0.1497
+  },
+  "hardware": "Apple M4 Pro, 16-core GPU, 24 GB unified memory",
+  "server": "llama.cpp version: 0.5.0 (build 11146, commit 7fe450e19)",
+  "modelId": "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+  "gpuPresetId": "apple-m4-pro-24gb",
+  "modelPresetId": "llama-3.1-8b-instruct-q4km",
+  "measuredAt": "2026-09-26",
+  "data": "calibration/data/llama-3.1-8b-q4km-m4pro"
+}

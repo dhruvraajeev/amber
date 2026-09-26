@@ -1,0 +1,10 @@
+{
+  "model": "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+  "draftModel": "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+  "hardware": "Apple M4 Pro, 16-core GPU, 24 GB unified memory",
+  "server": "version: 0.5.0 (build 11146, commit 7fe450e19)",
+  "command": "llama-server -m calibration/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf --port 8089 -np 8 -c 19456 -ngl 99 --no-webui",
+  "nPredict": 128,
+  "reps": 3,
+  "date": "2026-09-26"
+}
