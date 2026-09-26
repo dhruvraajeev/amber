@@ -1,4 +1,4 @@
-"""The files in shared/ that the frontend and backend both read: presets and templates.
+"""The files in shared/ that the frontend and backend both read: presets, timing profiles and templates.
 
 shared/ sits at the repo root, next to backend/, and the Dockerfile copies it to the same place.
 Every file is read once and cached; they never change while the server runs.
@@ -29,9 +29,18 @@ def presets(preset_file: str) -> dict[str, dict]:
 
 
 @cache
+def profiles() -> dict[str, dict]:
+    """The self-hosted LLM timing profiles in shared/profiles as {id: profile}: `default`, an uncalibrated
+    guess, and the ones calibration/fit.py measured."""
+    return {p["id"]: p for p in map(_read, sorted((SHARED / "profiles").glob("*.json")))}
+
+
+@cache
 def all_presets() -> dict[str, list]:
-    """Every preset list, for `GET /api/presets`."""
-    return {key: list(presets(file).values()) for key, file in PRESET_FILES.items()}
+    """Every preset list and the timing profiles, for `GET /api/presets`."""
+    return {key: list(presets(file).values()) for key, file in PRESET_FILES.items()} | {
+        "profiles": list(profiles().values())
+    }
 
 
 @cache

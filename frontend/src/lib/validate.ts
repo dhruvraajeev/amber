@@ -5,7 +5,7 @@ import gpus from '@shared/presets/gpus.json'
 import hostedLlms from '@shared/presets/hosted_llms.json'
 import models from '@shared/presets/models.json'
 import type { Design, DesignEdge, DesignNode, LatencyDist, RunConfig, TrafficProfile, ValidationIssue } from '../api/api'
-import { kvBudget } from './ai'
+import { kvBudget, profiles } from './ai'
 import { estimateDesignRequests } from './estimate'
 
 export const LIMITS = { nodes: 50, edges: 100, minDurationS: 10, maxDurationS: 600, rps: 5000, requests: 200_000 }
@@ -261,7 +261,7 @@ function paramProblems(node: DesignNode, callers: Caller[]): Problem[] {
         ...known('modelPresetId', p.modelPresetId, models),
         ...modelFits(p.gpuPresetId, p.modelPresetId),
         ...reserveCoversOutput(p.maxOutputTokensReserve, p.modelPresetId, callers),
-        ...(p.profileId ? [] : [['profileId', 'profileId is required.'] as Problem]),
+        ...known('profileId', p.profileId, profiles),
         ...within('replicas', p.replicas, 1, 50, true),
         ...within('maxBatchSize', p.maxBatchSize, 1, Infinity, true),
         ...within('maxBatchTokens', p.maxBatchTokens, 1, Infinity, true),

@@ -29,7 +29,8 @@ def test_healthz(client):
 
 def test_presets_are_the_shared_files_under_the_frontends_names(client):
     body = client.get("/api/presets").json()
-    assert body.keys() == {"gpus", "models", "hostedLlms", "databases", "services"}
+    assert body.keys() == {"gpus", "models", "hostedLlms", "databases", "services", "profiles"}
+    assert {p["id"] for p in body["profiles"]} == {p.stem for p in (SHARED / "profiles").glob("*.json")}
     assert body["hostedLlms"] == json.loads((SHARED / "presets" / "hosted_llms.json").read_text())
 
 

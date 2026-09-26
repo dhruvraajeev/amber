@@ -11,9 +11,9 @@ import math
 from pydantic import TypeAdapter, ValidationError
 
 from amber.contracts import Design, RunConfig, TrafficProfile, ValidationIssue
-from amber.presets import presets
+from amber.presets import presets, profiles
 from amber.sim.arrivals import expected_requests, peak
-from amber.sim.nodes.llm_selfhosted import GPU_MEMORY_UTILIZATION, PROFILES, kv_capacity_bytes
+from amber.sim.nodes.llm_selfhosted import GPU_MEMORY_UTILIZATION, kv_capacity_bytes
 
 MAX_NODES = 50
 MAX_EDGES = 100
@@ -21,14 +21,12 @@ MIN_DURATION_S, MAX_DURATION_S = 10, 600  # also enforced by RunConfig's field r
 MAX_RPS = 5000
 MAX_REQUESTS = 200_000
 
-# (llm mode, params field) → the ids it may name: a shared/presets file, or the timing profiles.
+# (llm mode, params field) → the ids it may name: a shared/presets file, or shared/profiles.
 PRESET_FIELDS = {
     ("hosted", "presetId"): lambda: presets("hosted_llms"),
     ("selfHosted", "gpuPresetId"): lambda: presets("gpus"),
     ("selfHosted", "modelPresetId"): lambda: presets("models"),
-    # ponytail: backend only; validate.ts checks profileId is non-empty, because the one profile lives
-    # in Python until calibration (v1.1) writes shared/profiles/. The UI still shows this 422 on the node.
-    ("selfHosted", "profileId"): lambda: PROFILES,
+    ("selfHosted", "profileId"): profiles,
 }
 
 _traffic = TypeAdapter(TrafficProfile)

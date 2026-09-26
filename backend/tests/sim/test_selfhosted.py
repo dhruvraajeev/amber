@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 from test_nodes import NODE, trail
 
-from amber.presets import presets
+from amber.presets import SHARED, presets, profiles
 from amber.sim.kernel import Environment, Process, Timeout
 from amber.sim.nodes import llm_selfhosted
 from amber.sim.nodes.llm_selfhosted import (
@@ -74,13 +74,21 @@ def test_prefill_and_decode_are_linear_in_their_size():
 
 
 def test_the_default_profile_is_the_one_the_template_names():
-    # shared/templates/agent-self-hosted.json uses profileId "default"; nothing else exists until
-    # calibration (v1.1).
+    # shared/templates/agent-self-hosted.json uses profileId "default" (shared/profiles/default.json).
     default = PROFILES["default"]
     assert default.prefill_ms(512) == pytest.approx(15 + 0.2 * 512)  # 117.4 ms
     assert default.decode_step_ms(1) == pytest.approx(50.5)  # ~20 tokens/s for one sequence
     assert default.decode_step_ms(32) > default.decode_step_ms(1)  # a bigger batch is a slower step…
     assert 32 / default.decode_step_ms(32) > 1 / default.decode_step_ms(1)  # …but far more tokens/s
+
+
+def test_measured_profiles_say_where_they_came_from():
+    for p in profiles().values():
+        if p["id"] == "default":
+            continue
+        assert {"fit", "hardware", "server", "modelId", "measuredAt"} <= p.keys(), p["id"]
+        assert p["gpuPresetId"] in presets("gpus") and p["modelPresetId"] in presets("models"), p["id"]
+        assert (SHARED.parent / p["data"] / "requests.csv").is_file(), p["id"]
 
 
 # ── KV cache (§8.7) ───────────────────────────────────────────────────────────
@@ -466,7 +474,7 @@ def test_speculative_tokens_range_from_one_to_all_drafts_plus_one():
 
 def test_the_verify_factor_is_linear_in_the_draft_tokens():
     assert PROFILES["default"].verify_factor(0) == 1
-    assert PROFILES["default"].verify_factor(4) == pytest.approx(1.4)  # c_v = 0.1 until calibrated
+    assert PROFILES["default"].verify_factor(4) == pytest.approx(1.4)  # default.json's c_v = 0.1
 
 
 def spec_served(monkeypatch, speculative, seed=42):

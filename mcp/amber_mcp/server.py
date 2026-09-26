@@ -44,10 +44,11 @@ Kinds and params:
   outputUsdPer1M, rateLimitRpm, maxRetries.
   Token sizes are not llm params: a call from an agent uses the agent's basePromptTokens and
   outputTokensPerCall; a call from anything else uses the preset's defaultPromptTokens/defaultOutputTokens.
-- llm, self-hosted: mode "selfHosted", gpuPresetId, modelPresetId, profileId ("default"), replicas,
+- llm, self-hosted: mode "selfHosted", gpuPresetId, modelPresetId, profileId, replicas,
   maxBatchSize, maxBatchTokens, maxOutputTokensReserve,
   speculative {"enabled","draftTokens","acceptanceRate","draftStepMs"}.
-  Speed comes from profileId alone (one uncalibrated profile for now); the GPU sets only memory (how many
+  Speed comes from profileId alone: a measured profile from get_presets when its gpuPresetId and
+  modelPresetId match the node's, else "default" (an estimate). The GPU sets only memory (how many
   requests fit in the KV cache at once) and price. So a faster GPU is not faster here: add replicas, raise
   maxBatchSize/maxBatchTokens, or enable speculative decoding.
 Numbers from a real codebase:
@@ -97,8 +98,8 @@ async def list_templates() -> list[dict]:
 
 @server.tool()
 async def get_presets() -> dict:
-    """The preset ids a design can name: gpus and models (for self-hosted llm nodes), hostedLlms (for hosted
-    llm nodes), databases and services (typical params). Prices are estimates."""
+    """The preset ids a design can name: gpus, models and timing profiles (for self-hosted llm nodes),
+    hostedLlms (for hosted llm nodes), databases and services (typical params). Prices are estimates."""
     presets = await _call("GET", "/api/presets")
     return {kind: [_without(p, "note", "verifiedAt") for p in items] for kind, items in presets.items()}
 

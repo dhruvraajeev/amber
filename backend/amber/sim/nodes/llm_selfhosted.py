@@ -10,7 +10,7 @@ from collections import deque
 from dataclasses import dataclass
 
 from amber.contracts import GpuPoint, LlmNode, SelfHostedLlmParams
-from amber.presets import presets
+from amber.presets import presets, profiles
 from amber.sim.kernel import Environment, Event, Process, ProcessGen, Timeout
 from amber.sim.nodes import Node
 from amber.sim.request import Request
@@ -32,7 +32,7 @@ class TimingProfile:
     prefill_ms_per_token: float  # b_p
     decode_base_ms: float  # a_d
     decode_ms_per_sequence: float  # b_d
-    verify_cost_per_draft_token: float = 0.1  # c_v, §8.7's default until calibration (v1.1) measures it
+    verify_cost_per_draft_token: float = 0.1  # c_v; §8.7's default, used by profiles that don't measure it
 
     def prefill_ms(self, tokens: int) -> float:
         """`a_p + b_p · tokens`: one prefill pass over this many prompt tokens."""
@@ -47,13 +47,16 @@ class TimingProfile:
         return 1 + self.verify_cost_per_draft_token * draft_tokens
 
 
-# ponytail: one uncalibrated profile until calibration (v1.1) measures real ones into shared/profiles/.
-# Rough shape of Llama 3.1 8B FP16 on an L4 (the agent-self-hosted template): ~5k prompt tokens/s of
-# prefill; ~20 tokens/s for one sequence, since each step reads all 16 GB of weights at ~300 GB/s.
+# shared/profiles: `default` (a guess at Llama 3.1 8B FP16 on an L4) and the profiles calibration measured.
 PROFILES = {
-    "default": TimingProfile(
-        prefill_base_ms=15.0, prefill_ms_per_token=0.2, decode_base_ms=50.0, decode_ms_per_sequence=0.5
-    ),
+    p["id"]: TimingProfile(
+        prefill_base_ms=p["prefillBaseMs"],
+        prefill_ms_per_token=p["prefillMsPerToken"],
+        decode_base_ms=p["decodeBaseMs"],
+        decode_ms_per_sequence=p["decodeMsPerSequence"],
+        verify_cost_per_draft_token=p["verifyCostPerDraftToken"],
+    )
+    for p in profiles().values()
 }
 
 

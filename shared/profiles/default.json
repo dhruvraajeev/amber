@@ -1,0 +1,10 @@
+{
+  "id": "default",
+  "name": "Default (uncalibrated)",
+  "prefillBaseMs": 15.0,
+  "prefillMsPerToken": 0.2,
+  "decodeBaseMs": 50.0,
+  "decodeMsPerSequence": 0.5,
+  "verifyCostPerDraftToken": 0.1,
+  "note": "A reasoned guess, not a measurement: roughly Llama 3.1 8B FP16 on an L4. ~5k prompt tokens/s of prefill; ~20 tokens/s for one sequence, since each step reads all 16 GB of weights at ~300 GB/s."
+}

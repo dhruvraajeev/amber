@@ -2,14 +2,12 @@ import gpus from '@shared/presets/gpus.json'
 import hostedLlms from '@shared/presets/hosted_llms.json'
 import models from '@shared/presets/models.json'
 import { LLM_DEFAULTS } from '../../canvas/map'
-import { kvBudget } from '../../lib/ai'
+import { kvBudget, profiles as timingProfiles } from '../../lib/ai'
 import { count } from '../../lib/format'
 import type { HostedLlmParams, LlmParams, SelfHostedLlmParams } from '../../api/api'
 import { DistField, NumberField, Readout, SelectField, SliderField, ToggleField, type FormProps } from '../fields'
 
-// ponytail: the backend's one timing profile (sim/nodes/llm_selfhosted.py PROFILES). Calibration (v1.1) measures real
-// ones into shared/profiles/, and this list should then be read from there.
-const PROFILES = [{ value: 'default', label: 'Default (uncalibrated)' }]
+const PROFILES = timingProfiles.map((p) => ({ value: p.id, label: p.name }))
 
 // The form swaps entirely on `mode`: hosted APIs and self-hosted GPUs share no fields.
 export default function LlmForm({ params: p, set, err }: FormProps<LlmParams>) {
@@ -108,7 +106,7 @@ function SelfHosted({ params: p, set, err }: FormProps<SelfHostedLlmParams>) {
         </Readout>
       )}
       <SelectField
-        label="Timing profile" help="Measured prefill and decode speed. Only an uncalibrated default exists until calibration (v1.1) measures real hardware."
+        label="Timing profile" help="Prefill and decode speed. Measured profiles come from benchmarking real hardware; the default is an estimate."
         value={p.profileId} options={profiles} error={err('profileId')}
         onChange={(profileId) => set({ ...p, profileId })}
       />

@@ -3,5 +3,6 @@
   { "id": "nvidia-l4-24gb", "name": "NVIDIA L4", "memoryGb": 24, "usdPerHour": 0.8, "verifiedAt": "2026-09-24", "note": "AWS on-demand, Linux, us-east-1: g6.xlarge (1× L4) $0.8048/h (instances.vantage.sh)" },
   { "id": "nvidia-a10g-24gb", "name": "NVIDIA A10G", "memoryGb": 24, "usdPerHour": 1.01, "verifiedAt": "2026-09-24", "note": "AWS on-demand, Linux, us-east-1: g5.xlarge (1× A10G) $1.006/h (instances.vantage.sh)" },
   { "id": "nvidia-a100-80gb", "name": "NVIDIA A100 80GB", "memoryGb": 80, "usdPerHour": 3.43, "verifiedAt": "2026-09-24", "note": "AWS on-demand, Linux, us-east-1: p4de.24xlarge (8× A100 80GB) $27.447/h ÷ 8 (instances.vantage.sh)" },
-  { "id": "nvidia-h100-80gb", "name": "NVIDIA H100 80GB", "memoryGb": 80, "usdPerHour": 6.88, "verifiedAt": "2026-09-24", "note": "AWS on-demand, Linux, us-east-1: p5.48xlarge (8× H100) $55.04/h ÷ 8 (instances.vantage.sh)" }
+  { "id": "nvidia-h100-80gb", "name": "NVIDIA H100 80GB", "memoryGb": 80, "usdPerHour": 6.88, "verifiedAt": "2026-09-24", "note": "AWS on-demand, Linux, us-east-1: p5.48xlarge (8× H100) $55.04/h ÷ 8 (instances.vantage.sh)" },
+  { "id": "apple-m4-pro-24gb", "name": "Apple M4 Pro", "memoryGb": 24, "usdPerHour": 1.97, "verifiedAt": "2026-09-26", "note": "The Mac calibration ran on (unified memory, shared with macOS). Price: AWS on-demand, us-east-1, mac-m4pro.metal (M4 Pro, 48 GB) $1.97/h, the nearest rentable M4 Pro; Mac hosts bill a 24 h minimum (instances.vantage.sh)" }
 ]

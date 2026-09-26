@@ -5,6 +5,11 @@ import gpus from '@shared/presets/gpus.json'
 import models from '@shared/presets/models.json'
 import type { AgentParams } from '../api/api'
 
+/** Self-hosted timing profiles, `default` plus the measured ones (shared/profiles; backend: presets.profiles). */
+export const profiles = Object.values(
+  import.meta.glob<{ id: string; name: string }>('@shared/profiles/*.json', { eager: true, import: 'default' }),
+)
+
 /** Share of GPU memory the server may use (§8.7's gpu_memory_utilization; backend: kv_capacity_bytes). */
 export const GPU_MEMORY_UTILIZATION = 0.9
 

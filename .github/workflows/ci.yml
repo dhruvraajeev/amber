@@ -38,10 +38,11 @@ jobs:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
       - run: uv sync --locked
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
+      # ../calibration: the benchmark and fitting scripts, linted and tested with the backend's settings.
+      - run: uv run ruff check . ../calibration
+      - run: uv run ruff format --check . ../calibration
       # Timing-sensitive tests are left out: a shared runner can't hold a wall-clock bound.
-      - run: uv run pytest -m "not slow"
+      - run: uv run pytest -m "not slow" . ../calibration
 
   # The MCP server's tests mock the API (respx), so they need no running backend.
   mcp:
