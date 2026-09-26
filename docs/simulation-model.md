@@ -144,6 +144,9 @@ formality. Alongside them, `test_determinism.py` proves the same inputs give byt
 (across processes with different hash seeds, too), and `test_perf.py` holds the speed targets: about
 12,000 requests in well under 2 s, and the 200,000-request cap in well under 15 s.
 
+The self-hosted LLM model is checked against real hardware separately: `calibration/validate.py`
+compares it with llama.cpp benchmarks and publishes the error in [calibration.md](calibration.md).
+
 ## Known simplifications
 
 All of these are deliberate. They are listed in the app under "Model assumptions" as well.

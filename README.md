@@ -240,7 +240,7 @@ Short version: **the simulator's math is right; the answer is only as good as th
 | **Queueing math** | Against textbook systems with exact answers (`backend/tests/sim/test_queueing_theory.py`) | Within 1% |
 | **Cost arithmetic** | Against the exact formula, over hundreds of runs | Flat prices are exact. Hosted-LLM token cost is within 2.5%, even for 30-second runs |
 | **A real running system** | Amber predicted its own API, which was then load-tested for real | Close when set up right, far off when set up wrong (below) |
-| **GPU serving** | Not yet: one rough timing profile | An informed estimate until it's calibrated |
+| **GPU serving** | Against llama.cpp on a real Mac, each case predicted by a fit that never saw it ([docs/calibration.md](docs/calibration.md)) | Median error 4–6%; worst cases 33% (long prompts) and 3× (speculative decoding) |
 
 **The textbook checks** (100 runs × 600 s each):
 
@@ -272,10 +272,27 @@ error in p99. Same system, 90% busy, service time nudged up:
 |---|---|---|---|---|
 | p99 | 402 ms | 581 ms | 895 ms | 13.8 s |
 
-**LLM serving is not calibrated yet.** Self-hosted GPU timing comes from one rough profile (Llama 3.1
-8B FP16 on an L4), and presets carry prices marked "verify." Treat AI latency and cost figures as
-informed estimates. **Calibration against real hardware (llama.cpp benchmarks, with the measured error
-published here) is next.**
+**GPU serving, measured.** llama.cpp served Llama 3.1 8B (Q4_K_M) on an Apple M4 Pro (24 GB) with 8
+slots, and every request was timed. Amber then predicted each case with a profile fitted to all the
+*other* cases, fed the benchmark's own traffic. Time to first token (TTFT) and end to end (E2E) in ms,
+real / Amber (error); the full table, including every bad row, is in
+[docs/calibration.md](docs/calibration.md):
+
+| Case | TTFT p50 | E2E p50 | E2E p99 |
+|---|---|---|---|
+| 1 request, 128-token prompt | 356 / 366 (+3%) | 3,188 / 3,344 (+5%) | 3,202 / 3,344 (+4%) |
+| 2 at once, 128 tokens | 699 / 733 (+5%) | 5,657 / 6,701 (+18%) | 5,719 / 6,701 (+17%) |
+| 8 at once, 512 tokens | 8,801 / 8,837 (+0%) | 36,016 / 35,491 (−1%) | 36,663 / 35,538 (−3%) |
+| 4 at once, 2,048 tokens | 22,005 / 14,698 (−33%) | 38,061 / 35,303 (−7%) | 38,266 / 35,350 (−8%) |
+| Speculative, 2 draft tokens | 356 / 366 (+3%) | 6,238 / 4,074 (−35%) | 6,332 / 4,271 (−33%) |
+| Speculative, 8 draft tokens | 358 / 366 (+2%) | 12,377 / 35,286 (+185%) | 12,858 / 38,493 (+199%) |
+| **Median over all 15 cases** | **5%** | **6%** | **6%** |
+
+Two cautions. This is **one machine and one engine**: other GPUs still run on the `default` profile,
+an uncalibrated estimate. And the benchmark kept the server full, so the same rate as random
+arrivals (how Amber usually runs) queues without limit and misses by hundreds of percent: near
+capacity, Amber is only as good as your headroom. Presets carry prices marked "verify"; treat cost
+figures as estimates.
 
 ## Limitations
 
@@ -290,9 +307,9 @@ Amber is a model, not a benchmark, and it simplifies on purpose. The same list i
 - Self-hosted LLMs never preempt an admitted request, and prefill and decode times are linear in
   tokens and batch size. Speculative decoding accepts each draft token at a fixed rate.
 - A self-hosted LLM's decode step doesn't get slower as conversations get longer yet, so long-context
-  agents look faster than they are (fixed by calibration).
+  agents look faster than they are.
 - GPU memory doesn't set aside room for the model's working memory (activations) yet, so a GPU fits a
-  few more requests than it really would (fixed by calibration).
+  few more requests than it really would.
 - Hosted LLM APIs have unlimited concurrency apart from their rate limit.
 - Monthly cost assumes the simulated window repeats all month.
 - The public instance limits runs to 600 simulated seconds, 5,000 requests/second, about 200,000
@@ -383,9 +400,9 @@ TypeScript types. CI fails if you forget.
 
 ## Roadmap
 
-- **Next: calibration.** Benchmark llama.cpp on real hardware, fit the GPU timing model, and publish
-  the simulator's measured error.
-- **Later:** hosted-API calibration, saved designs with share links, push-to-deploy, OpenTelemetry
+- **Done in v1.1: calibration.** llama.cpp benchmarked on real hardware, the GPU timing model fitted
+  to it, and the simulator's measured error published ([docs/calibration.md](docs/calibration.md)).
+- **Later:** hosted-API calibration, measured profiles for more GPUs, saved designs with share links, push-to-deploy, OpenTelemetry
   traces, and an accessibility pass.
 
 ## License
