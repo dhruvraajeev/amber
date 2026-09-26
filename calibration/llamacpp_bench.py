@@ -95,9 +95,11 @@ def main() -> None:
             for rep in range(args.reps):
                 record(round_(args, "draft", 0, 1, PROMPT_TOKENS[0], rep))
         for k in DRAFT_TOKENS:
-            # min = max and no probability cut-off: every step drafts and checks exactly k tokens.
-            spec = ["-md", str(args.draft), "--spec-draft-n-max", str(k), "--spec-draft-n-min", str(k)]
-            with serve(base_cmd + [*spec, "--spec-draft-p-min", "0"], args.port, f"spec-k{k}"):
+            # Loading a draft model doesn't turn speculation on (--spec-type defaults to none). min = max and
+            # no probability cut-off: every step drafts and checks exactly k tokens.
+            spec = ["-md", str(args.draft), "--spec-type", "draft-simple", "--spec-draft-p-min", "0",
+                    "--spec-draft-n-max", str(k), "--spec-draft-n-min", str(k)]  # fmt: skip
+            with serve(base_cmd + spec, args.port, f"spec-k{k}"):
                 for rep in range(args.reps):
                     record(round_(args, "speculative", k, 1, PROMPT_TOKENS[0], rep))
                     print(f"spec  k={k} rep={rep}")

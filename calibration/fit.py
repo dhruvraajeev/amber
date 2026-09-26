@@ -4,7 +4,8 @@
         --gpu-preset <shared/presets/gpus.json id> --model-preset <shared/presets/models.json id>
 
 Standard library only. The model (docs/simulation-model.md, "Self-hosted LLM") is three lines, and each
-is fitted by least squares from the rows where the server's own timings measure exactly that quantity:
+is fitted by least squares, with fixed costs held at 0 or above, from the rows where the server's own
+timings measure exactly that quantity:
 
 - prefill `a_p + b_p · tokens`: concurrency 1, where `prompt_ms` is one prompt's pass and nothing else.
 - decode `a_d + b_d · batch`: 128-token prompts. All `c` of them fit in one prefill pass, so every step
@@ -104,8 +105,10 @@ def fit(rows: list[dict]) -> dict:
 
 
 def line(xs: list[float], ys: list[float]) -> tuple[float, float, dict]:
-    """Least-squares `y = a + b·x`: a, b, and {r2, samples}."""
+    """Least-squares `y = a + b·x` with `a ≥ 0` (a fixed cost can't be negative): a, b, and {r2, samples}."""
     b, a = statistics.linear_regression(xs, ys)
+    if a < 0:  # the best line with a ≥ 0 then has a = 0 exactly (the error is convex in a)
+        b, a = statistics.linear_regression(xs, ys, proportional=True)
     mean = statistics.fmean(ys)
     ss_res = sum((y - a - b * x) ** 2 for x, y in zip(xs, ys, strict=True))
     ss_tot = sum((y - mean) ** 2 for y in ys)

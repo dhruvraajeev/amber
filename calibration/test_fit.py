@@ -46,3 +46,10 @@ def test_an_overstated_draft_cost_floors_c_v_at_zero() -> None:
     rows += [row("draft", 1, 128) | {"predicted_ms": 2 * DRAFT_MS * N}]
     rows += [row("speculative", 1, 128, k) for k in (2, 4, 8)]
     assert fit(rows)["verifyCostPerDraftToken"] == 0
+
+
+def test_a_negative_fixed_cost_becomes_zero() -> None:
+    # Cost exactly proportional to the work, plus noise that tips the intercept below 0.
+    rows = [row("base", 1, p) | {"prompt_ms": 2.8 * p + 5 * (p == 2048)} for p in (128, 512, 2048)]
+    got = fit(rows + [row("base", c, 128) for c in (2, 4)])
+    assert got["prefillBaseMs"] == 0 and got["prefillMsPerToken"] == pytest.approx(2.8, rel=0.01)
