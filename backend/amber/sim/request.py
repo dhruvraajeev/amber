@@ -3,8 +3,9 @@
 from dataclasses import dataclass, field
 from typing import Literal, NamedTuple
 
-# "ok" and "timeout" are decided at the end by the users node; the rest are errors raised on the way.
-Status = Literal["ok", "timeout", "rejected", "rate_limited"]
+# "ok" and "timeout" are decided at the end by the users node; the rest are set on the way. "abandoned" is
+# a request a server dropped because its client had already given up; metrics report it as a timeout.
+Status = Literal["ok", "timeout", "rejected", "rate_limited", "abandoned"]
 
 
 class Span(NamedTuple):

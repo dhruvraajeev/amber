@@ -532,3 +532,38 @@ def test_speculation_pays_off_only_when_drafts_are_accepted(monkeypatch):
 def test_speculation_is_deterministic_per_seed(monkeypatch):
     assert finish_time(monkeypatch, spec(0.7)) == finish_time(monkeypatch, spec(0.7))
     assert finish_time(monkeypatch, spec(0.7)) != finish_time(monkeypatch, spec(0.7), seed=43)
+
+
+# ── Clients that give up ──────────────────────────────────────────────────────
+
+
+def send_with_deadline(env, node, rid, at, deadline, prompt, output):
+    req = Request(rid, at, deadline)
+
+    def arrive():
+        yield Timeout(env, at)
+        yield from node.call(req, prompt, output)
+
+    Process(env, arrive())
+    return req
+
+
+def test_a_call_whose_client_gave_up_while_it_waited_is_dropped_before_it_uses_the_gpu(monkeypatch):
+    # One at a time: "a" (prefill 110 ms + 99 decode steps of 6 ms) holds the GPU until ~704 ms, long
+    # after "b"'s client left at 100 ms. "b" must leave the line without a prefill of its own.
+    env, node = served(monkeypatch, lambda waiting, *_: min(1, len(waiting)))
+    a = send(env, node, "a", 0, prompt=100, output=100)
+    b = send_with_deadline(env, node, "b", 0, 100, prompt=100, output=100)
+    env.run(10_000)
+    assert (a.status, b.status) == (None, "abandoned")
+    assert b.first_token_at is None and b.spans == []
+    assert (node.served, node.rejects, node.replicas[0].kv_used) == (1, 0, 0)
+
+
+def test_a_running_call_whose_client_gave_up_leaves_the_batch_and_frees_its_kv(monkeypatch):
+    env, node = served(monkeypatch)
+    req = send_with_deadline(env, node, "a", 0, 50, prompt=100, output=1000)
+    env.run(10_000)
+    assert req.status == "abandoned"
+    assert req.first_token_at == 110  # it was prefilled, then dropped at the first check past 50 ms
+    assert node.replicas[0].kv_used == 0 and node.replicas[0].load == 0

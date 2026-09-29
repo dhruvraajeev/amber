@@ -8,6 +8,7 @@ from amber.contracts import AttributionRow, Bottleneck, GpuSeries, NodeSummary, 
 from amber.sim.request import Request
 
 MAX_FINDINGS = 5
+MIN_GROWING_QUEUE = 5  # a line shorter than this at the end isn't "growing", whatever its trend
 SEVERITIES = ("critical", "warn", "info")  # most severe first
 # §8.9's table, row by row: name -> (severity, message). A finding ranks by its severity, then by its row.
 # "kv_rejects" is §8.9's reject row worded for a self-hosted LLM, which has no queueLimit.
@@ -125,12 +126,14 @@ def bottlenecks(
 
 def _queue_growing(queue: list[float]) -> bool:
     """§8.9: over the last half of the run the queue trends up (least-squares slope > 0), and it ends at
-    more than twice its median length over the whole run."""
+    more than twice its median length over the whole run and at least `MIN_GROWING_QUEUE` long (with a
+    median of 0, a single request waiting at the end would otherwise count)."""
     last_half = queue[len(queue) // 2 :]
     if len(last_half) < 2:
         return False
     slope = statistics.linear_regression(range(len(last_half)), last_half).slope
-    return slope > 0 and queue[-1] > 2 * statistics.median(queue)
+    end = queue[-1]
+    return slope > 0 and end >= MIN_GROWING_QUEUE and end > 2 * statistics.median(queue)
 
 
 def _pct(fraction: float) -> int:

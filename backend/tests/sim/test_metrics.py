@@ -5,7 +5,7 @@ from test_nodes import send_at, service, users
 
 from amber.contracts import Design, RunConfig
 from amber.sim.kernel import Environment, Process, Resource, Timeout
-from amber.sim.metrics import Metrics
+from amber.sim.metrics import Metrics, outcome
 from amber.sim.nodes import Node
 from amber.sim.request import Request
 
@@ -160,3 +160,8 @@ def design_with(*node_ids):
         for i in node_ids
     ]  # fmt: skip
     return Design(name="t", version=1, nodes=nodes, edges=[])
+
+
+def test_an_abandoned_request_is_a_timeout_at_its_deadline_with_no_latency():
+    req = Request("r", 1000.0, 3000.0, status="abandoned", end=3500.0)
+    assert outcome(req, 60_000.0) == ("timeout", 3000.0, None)

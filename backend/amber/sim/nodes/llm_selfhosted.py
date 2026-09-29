@@ -13,7 +13,7 @@ from amber.contracts import GpuPoint, LlmNode, SelfHostedLlmParams
 from amber.presets import presets, profiles
 from amber.sim.kernel import Environment, Event, Process, ProcessGen, Timeout
 from amber.sim.nodes import Node
-from amber.sim.request import Request
+from amber.sim.request import Request, Status
 from amber.sim.rng import stream
 
 GPU_MEMORY_UTILIZATION = 0.9  # share of GPU memory the server may use, vLLM's default (§8.7)
@@ -250,11 +250,22 @@ class SelfHostedLlm(Node):
         every sequence already running (or, with speculative decoding, however many it accepts). The
         admitted join the batch at once (they hold KV from now on). At the end of the step they have
         their first token, and any sequence with all its output is done and frees its KV.
+
+        A call whose client has already given up is dropped, as vLLM aborts a request when its client
+        disconnects: from the front of the line before admission, and from the batch after each step.
+        Serving it anyway would spend GPU time on answers no one reads, so overload would cut how many
+        requests finish instead of holding it at capacity.
         """
         while True:
+            # ponytail: only the front of the line is checked, so an expired call behind a live one can
+            # still be admitted and then costs one step before the batch check drops it. Scanning the
+            # whole line every step is O(line) per step; do that only if the wasted steps ever show.
+            while replica.waiting and self._abandoned(replica.waiting[0]):
+                self._hand_back(replica.waiting.popleft(), "abandoned")
             if not replica.load:
                 replica.idle = Event(self.env)
                 yield replica.idle
+                continue
 
             n = admit(
                 replica.waiting,
@@ -287,6 +298,9 @@ class SelfHostedLlm(Node):
                     seq.req.first_token_at = self.env.now
             still_running = []
             for seq in replica.running:
+                if self._abandoned(seq):
+                    self._finish(replica, seq, "abandoned")
+                    continue
                 # A prefill yields exactly the first token; a decode step may yield several, never
                 # more than the call asked for.
                 gained = self._decode_tokens() if seq.generated else 1
@@ -311,13 +325,22 @@ class SelfHostedLlm(Node):
             return speculative_tokens(self._accept_rng, spec.draft_tokens, spec.acceptance_rate)
         return 1
 
-    def _finish(self, replica: Replica, seq: Sequence) -> None:
-        """The one way out of the batch: free the sequence's KV and hand its caller back control.
-        Anything that ever cancels a sequence must leave through here too."""
+    def _abandoned(self, seq: Sequence) -> bool:
+        return self.env.now > seq.req.deadline
+
+    def _finish(self, replica: Replica, seq: Sequence, status: Status | None = None) -> None:
+        """The one way out of the batch: free the sequence's KV and hand its caller back control, failing
+        the request with `status` if one is given. Anything that cancels a sequence leaves through here."""
         replica.kv_used -= seq.kv_bytes
-        seq.done.succeed()
+        self._hand_back(seq, status)
 
     def _reject(self, seq: Sequence) -> None:
-        seq.req.status = "rejected"
         self.rejects += 1
+        self._hand_back(seq, "rejected")
+
+    @staticmethod
+    def _hand_back(seq: Sequence, status: Status | None) -> None:
+        """Hand the caller back control; with a `status`, the request fails with it and callers unwind."""
+        if status is not None:
+            seq.req.status = status
         seq.done.succeed()

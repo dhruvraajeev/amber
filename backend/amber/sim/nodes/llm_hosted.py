@@ -22,7 +22,8 @@ class HostedLlm(Node):
     only one second's worth (at least one). Starting full would hand every run a free minute of
     traffic, so a 60 s run would pass nearly twice the limit before its first 429.
     A call that finds it empty gets a 429, backs off and retries up to `maxRetries` times, then the
-    request fails as `rate_limited`. The span's `queue_ms` is that backoff time; `work_ms` is the call.
+    request fails as `rate_limited`, or as `abandoned` if its client gave up during a backoff (never
+    billed, and no permit spent on it). The span's `queue_ms` is that backoff time; `work_ms` is the call.
 
     `usd` is what calls admitted from `bill_from_ms` on cost, billed the moment a call gets its permit. That
     measures the spend of the steady state, like the summary: a call still streaming when the run ends is
@@ -66,6 +67,9 @@ class HostedLlm(Node):
                 return
             yield Timeout(self.env, self.backoff_ms(attempt))
             attempt += 1
+            if self.env.now > req.deadline:  # the client gave up during the backoff: retry for no one
+                req.status = "abandoned"
+                return
         backoff_ms = self.env.now - started_at
         if self.env.now >= self.bill_from_ms:
             usd_in, usd_out = self._usd_per_token

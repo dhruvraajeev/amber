@@ -53,15 +53,21 @@ def lognormal_from_p50_p1(p50: float, p1: float) -> tuple[float, float]:
     return math.log(p50), (math.log(p50) - math.log(p1)) / Z99
 
 
-def poisson(rng: random.Random, mean: float) -> int:
-    """A Poisson-distributed count, by Knuth's method (multiply uniforms until below e^-mean).
+KNUTH_MAX_MEAN = 500  # e^-mean underflows near 745; past this, the normal approximation is accurate
 
-    Agent LLM calls per request are `1 + poisson(rng, llmCallsMean - 1)` (§8.5).
+
+def poisson(rng: random.Random, mean: float) -> int:
+    """A Poisson-distributed count. Agent LLM calls per request are `1 + poisson(rng, llmCallsMean - 1)`.
+
+    Up to `KNUTH_MAX_MEAN`, Knuth's method: multiply uniforms until below e^-mean, O(mean) draws. Above
+    it, one normal draw with the same mean and variance, rounded: Knuth would underflow there (it would
+    stall near 745), and one draw keeps a huge mean from running inside a single simulator event, where
+    the wall-clock limit can't stop it.
     """
-    # ponytail: Knuth is O(mean) per draw and e^-mean underflows near mean 745. Agent means are
-    # single or double digits; switch to a normal approximation if large means ever matter.
     if mean < 0:
         raise ValueError("mean must be >= 0")
+    if mean > KNUTH_MAX_MEAN:
+        return max(0, round(rng.gauss(mean, math.sqrt(mean))))
     limit, k, product = math.exp(-mean), 0, rng.random()
     while product > limit:
         k += 1

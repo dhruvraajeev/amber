@@ -1,5 +1,6 @@
 """The hosted LLM node (plan §8.6): latency shape, first token, cost, and the rate limit with backoff."""
 
+import math
 import statistics
 
 import pytest
@@ -175,3 +176,17 @@ def test_retries_draw_jitter_from_their_own_stream_so_latencies_do_not_shift():
         return send(env, llm(env, rpm=rpm, retries=7, ttft_ms=None), 2)[1].spans[0].work_ms
 
     assert second_call_work_ms(rpm=2) == second_call_work_ms(rpm=3000)
+
+
+def test_a_call_stops_retrying_once_its_client_has_given_up():
+    # 2 rpm: the second call is refused, backs off >= 500 ms, and by then its client (100 ms) is gone.
+    env = Environment()
+    node = llm(env, rpm=2, retries=7)
+    ok, late = Request("ok", 0.0, math.inf), Request("late", 0.0, 100.0)
+    for req in (ok, late):
+        Process(env, node.call(req, PROMPT, OUTPUT))
+    env.run(1e7)
+    assert (ok.status, late.status) == (None, "abandoned")
+    assert late.spans == [] and late.first_token_at is None
+    assert node.rejects == 1  # the first try only: no retry after the client left
+    assert node.usd == pytest.approx(usd(1))  # and never billed

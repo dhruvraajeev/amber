@@ -1,6 +1,7 @@
 """Seeded streams and distributions (plan §8.2, §8.3): reproducible everywhere, and shaped as specified."""
 
 import hashlib
+import math
 import os
 import random
 import statistics
@@ -108,3 +109,31 @@ def test_poisson_has_the_right_mean_and_variance():
 def test_agent_with_mean_one_always_makes_exactly_one_llm_call():
     rng = stream(3, "n_agent", "work")
     assert {1 + poisson(rng, 0) for _ in range(1000)} == {1}
+
+
+def knuth(rng, mean):
+    """The Knuth draw as it was before large means got their own path."""
+    limit, k, product = math.exp(-mean), 0, rng.random()
+    while product > limit:
+        k += 1
+        product *= rng.random()
+    return k
+
+
+@pytest.mark.parametrize("mean", [0, 2, 3.5, 500])
+def test_poisson_up_to_500_draws_exactly_what_it_always_did(mean):
+    # Existing designs must give byte-identical runs: same seed, same counts, same stream position.
+    new, old = random.Random(9), random.Random(9)
+    assert [poisson(new, mean) for _ in range(200)] == [knuth(old, mean) for _ in range(200)]
+    assert new.random() == old.random()
+
+
+def test_poisson_stays_right_past_where_knuth_underflows():
+    rng = random.Random(5)
+    counts = [poisson(rng, 1000) for _ in range(20_000)]
+    assert statistics.fmean(counts) == pytest.approx(1000, rel=0.01)  # Knuth alone gave ~745
+    assert statistics.variance(counts) == pytest.approx(1000, rel=0.05)
+
+
+def test_a_huge_poisson_mean_is_one_draw_not_a_hang():
+    assert poisson(random.Random(1), 1e12) == pytest.approx(1e12, rel=1e-4)

@@ -88,7 +88,11 @@ def outcome(req: Request, run_end_ms: float) -> Outcome | None:
     whose deadline passed before the run ended is a timeout at that deadline: it will end even later,
     so `Request.finish` could only say timeout too. It has no latency, since no response ever came
     within the run; its span trail is also incomplete, which keeps it out of attribution.
+    An abandoned request (a server dropped it after its client gave up) is a timeout at its deadline
+    too, with no latency: no response ever came.
     """
+    if req.status == "abandoned":  # dropped after its deadline, so the deadline is inside the run
+        return Outcome("timeout", req.deadline, None)
     if req.end is not None and req.end < run_end_ms:
         latency = req.end - req.created_at if req.status in ANSWERED else None
         return Outcome(req.status, req.end, latency)

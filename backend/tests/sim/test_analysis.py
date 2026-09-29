@@ -106,6 +106,11 @@ def test_a_queue_that_keeps_growing_is_critical_but_a_full_steady_one_is_not():
     assert run([node()], {"api": [200.0] * 60}) == run([node()])  # full and flat: rejects say it instead
 
 
+def test_one_request_waiting_at_the_end_of_an_empty_run_is_not_a_growing_queue():
+    # Upward slope and more than twice the median (0), but a line of 1 is noise, not overload.
+    assert run([node()], {"api": [0.0] * 59 + [1.0]}) == run([node()])
+
+
 def test_rejects_are_critical_with_their_share_of_requests():
     assert run([node(rejects=50)]) == [
         ("critical", "api", "API rejected 50 requests (5.0%). Raise queueLimit or add capacity.")
