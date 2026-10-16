@@ -16,7 +16,7 @@ export default function CostTicker() {
     <div
       role="img"
       aria-label={`Estimated ${usd(result.cost.monthlyTotalUsd)} a month; ${usd(now)} a month at the current traffic`}
-      className="pointer-events-none absolute top-4 right-4 z-10 min-w-44 rounded-2xl border border-border bg-panel/85 px-4 py-3 shadow-[0_18px_40px_-20px_rgb(0_0_0/0.9),0_0_40px_-18px_rgb(255_106_43/0.6)] backdrop-blur-sm"
+      className="pointer-events-none absolute top-4 right-4 z-10 min-w-44 rounded-2xl border border-border bg-panel/85 px-4 py-3 shadow-[0_18px_40px_-20px_rgb(var(--drop)/0.9),0_0_40px_-18px_rgb(255_106_43/0.6)] backdrop-blur-sm"
     >
       <div className="text-xs text-muted">Monthly cost</div>
       <div className="figure mt-0.5 text-[22px] font-semibold leading-tight">

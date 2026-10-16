@@ -17,7 +17,7 @@ export default function PlaybackBar() {
   const last = lastPoint(result)
   return (
     <div
-      className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-panel/85 py-1.5 pr-4 pl-1.5 shadow-[0_18px_40px_-20px_rgb(0_0_0/0.9)] backdrop-blur-sm"
+      className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-panel/85 py-1.5 pr-4 pl-1.5 shadow-[0_18px_40px_-20px_rgb(var(--drop)/0.9)] backdrop-blur-sm"
       role="group" aria-label="Playback"
     >
       <button className="btn-icon size-8" onClick={() => setPlayhead(playhead - 1)} disabled={playhead === 0} aria-label="Step back">

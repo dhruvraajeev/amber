@@ -34,10 +34,46 @@
   --series-6: #a8321f;
 
   /* Depth: every surface sits a little above the ground, lit from above. */
-  --lift: 0 1px 0 0 rgb(255 255 255 / 0.04) inset, 0 18px 40px -24px rgb(0 0 0 / 0.9), 0 2px 6px -2px rgb(0 0 0 / 0.6);
+  --lift: 0 1px 0 0 rgb(255 255 255 / 0.04) inset, 0 18px 40px -24px rgb(var(--drop) / 0.9), 0 2px 6px -2px rgb(var(--drop) / 0.6);
   --radius: 1rem;
+  /* Channels: --ink draws lines and edges over the ground, --drop is shadow. */
+  --ink: 255 255 255;
+  --drop: 0 0 0;
 
   color-scheme: dark;
+}
+
+/* Light mode (TopBar's sun): the same ember layout on warm paper. Surfaces and text flip; orange and red
+   deepen so they hold contrast on white, as two's blues do in its light mode. [data-theme] sits on <html>. */
+:root[data-theme="light"] {
+  --bg: #f7f3f0;
+  --panel: #ffffff;
+  --panel-2: #fcfaf8;
+  --panel-3: #f2ece8;
+  --border: #e9e1dc;
+  --border-strong: #d8cdc6;
+  --grid: #ddd2cb;
+  --text: #1c1310;
+  --muted: #65574f;
+  --faint: #8f817a;
+  --accent: #e0551b;
+  --accent-2: #c4460f;
+  --ember: #d23a2c;
+  --ok: #4d413b; /* healthy load reads as calm ink */
+  --warn: #c75a12;
+  --crit: #b3231f;
+
+  --series-1: #e0551b;
+  --series-2: #4d413b;
+  --series-3: #d23a2c;
+  --series-4: #f29a62;
+  --series-5: #9a8d86;
+  --series-6: #a8321f;
+
+  --ink: 60 35 25;
+  --drop: 170 135 115; /* pale warm, so dark-mode shadow strengths stay soft */
+
+  color-scheme: light;
 }
 
 /* Tokens as Tailwind utilities (bg-panel, text-muted, border-crit, ...). Tailwind's default palette
@@ -136,7 +172,7 @@ input[type="range"]::-webkit-slider-thumb {
   height: 14px;
   border-radius: 999px;
   background: var(--text);
-  box-shadow: 0 0 0 3px rgb(255 106 43 / 0.25), 0 2px 6px rgb(0 0 0 / 0.6);
+  box-shadow: 0 0 0 3px rgb(255 106 43 / 0.25), 0 2px 6px rgb(var(--drop) / 0.6);
 }
 input[type="range"]::-moz-range-thumb {
   width: 14px;
@@ -144,7 +180,7 @@ input[type="range"]::-moz-range-thumb {
   border: 0;
   border-radius: 999px;
   background: var(--text);
-  box-shadow: 0 0 0 3px rgb(255 106 43 / 0.25), 0 2px 6px rgb(0 0 0 / 0.6);
+  box-shadow: 0 0 0 3px rgb(255 106 43 / 0.25), 0 2px 6px rgb(var(--drop) / 0.6);
 }
 
 /* All metrics: mono, tabular figures. Big figures use `.figure` (sans, tabular). */
@@ -221,7 +257,7 @@ input[type="range"]::-moz-range-thumb {
     overflow: hidden;
     border-radius: 999px;
     background: var(--text);
-    color: #120c0a;
+    color: var(--bg);
     font-weight: 600;
     box-shadow: 0 6px 20px -8px rgb(255 106 43 / 0.7), 0 1px 0 rgb(255 255 255 / 0.6) inset;
     transition: box-shadow 200ms ease-out, transform 150ms ease-out;
@@ -274,12 +310,12 @@ input[type="range"]::-moz-range-thumb {
   .segmented > [aria-selected="true"] {
     background: var(--panel-3);
     color: var(--text);
-    box-shadow: 0 1px 0 rgb(255 255 255 / 0.06) inset, 0 2px 8px -2px rgb(0 0 0 / 0.7);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.06) inset, 0 2px 8px -2px rgb(var(--drop) / 0.7);
   }
 
   /* Mission-deck corner ticks on the canvas frame. */
   .hud-corners {
-    --tick: rgb(255 255 255 / 0.18);
+    --tick: rgb(var(--ink) / 0.18);
     background:
       linear-gradient(var(--tick), var(--tick)) top 10px left 10px / 12px 1px,
       linear-gradient(var(--tick), var(--tick)) top 10px left 10px / 1px 12px,
@@ -435,7 +471,7 @@ input[type="range"]::-moz-range-thumb {
 .react-flow.dark {
   --xy-background-color: transparent;
   --xy-background-pattern-color: var(--grid);
-  --xy-edge-stroke: rgb(255 255 255 / 0.2);
+  --xy-edge-stroke: rgb(var(--ink) / 0.2);
   --xy-edge-stroke-selected: var(--accent);
   --xy-edge-label-background-color: var(--panel-2);
   --xy-edge-label-color: var(--muted);

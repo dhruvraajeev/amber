@@ -17,10 +17,10 @@ export default function NodeCard({ id, data, selected }: NodeProps<FlowNode>) {
   const glows = load && hasCapacity(data.kind) && !selected // the selection glow wins over the load glow
   return (
     <div
-      className={`relative min-w-44 rounded-xl border bg-[linear-gradient(180deg,rgb(255_255_255/0.05),rgb(255_255_255/0)_60%),var(--panel-2)] py-2.5 pr-3.5 pl-2.5 shadow-[0_10px_24px_-12px_rgb(0_0_0/0.9)] transition-[border-color,box-shadow] duration-200 ${
+      className={`relative min-w-44 rounded-xl border bg-[linear-gradient(180deg,rgb(255_255_255/0.05),rgb(255_255_255/0)_60%),var(--panel-2)] py-2.5 pr-3.5 pl-2.5 shadow-[0_10px_24px_-12px_rgb(var(--drop)/0.9)] transition-[border-color,box-shadow] duration-200 ${
         selected ? 'border-accent shadow-[0_0_0_3px_rgb(255_106_43/0.2),0_10px_30px_-8px_rgb(255_106_43/0.5)]' : 'border-border-strong'
       }`}
-      style={glows ? { borderColor: loadColor(load.util), boxShadow: `${loadGlow(load.util)}, 0 10px 24px -12px rgb(0 0 0 / 0.9)` } : undefined}
+      style={glows ? { borderColor: loadColor(load.util), boxShadow: `${loadGlow(load.util)}, 0 10px 24px -12px rgb(var(--drop) / 0.9)` } : undefined}
     >
       {data.kind !== 'users' && <Handle type="target" position={Position.Left} />}
       {bottleneck && (

@@ -75,7 +75,7 @@ export default function RunBar() {
       >
         {running ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Play size={14} fill="currentColor" aria-hidden />}
         {running ? 'Running…' : 'Run'}
-        {!running && <kbd className="num ml-1 rounded border border-black/15 px-1 text-[10px] font-normal text-black/50">R</kbd>}
+        {!running && <kbd className="num ml-1 rounded border border-bg/15 px-1 text-[10px] font-normal text-bg/50">R</kbd>}
       </button>
     </footer>
   )

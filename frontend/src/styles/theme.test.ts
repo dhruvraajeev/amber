@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const css = readFileSync(new URL('./theme.css', import.meta.url), 'utf8')
+const file = readFileSync(new URL('./theme.css', import.meta.url), 'utf8')
+const light = file.slice(file.indexOf(':root[data-theme="light"]'))
 
-function token(name: string): string {
+function tokenIn(name: string, css: string): string {
   const m = css.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i'))
   if (!m) throw new Error(`token --${name} missing`)
   return m[1]
@@ -23,7 +24,12 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05)
 }
 
-describe('theme tokens (plan §11.3, revised 2026-09-23)', () => {
+describe.each([
+  ['dark', file],
+  ['light', light],
+])('%s theme tokens (plan §11.3, revised 2026-09-23)', (_, css) => {
+  const token = (name: string) => tokenIn(name, css)
+
   it('keeps ok / warn / crit distinguishable in greyscale', () => {
     const [ok, warn, crit] = ['ok', 'warn', 'crit'].map(token)
     for (const [a, b] of [[ok, warn], [warn, crit], [ok, crit]]) {

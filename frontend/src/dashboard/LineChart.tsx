@@ -94,7 +94,7 @@ export default function LineChart({ xs, series, format, max, summary, markAt }: 
                 />
               ))}
               <div
-                className="pointer-events-none absolute top-0 z-10 rounded-xl border border-border-strong bg-panel-3/95 px-3 py-2 text-xs whitespace-nowrap shadow-[0_12px_30px_-10px_rgb(0_0_0/0.9)] backdrop-blur-sm"
+                className="pointer-events-none absolute top-0 z-10 rounded-xl border border-border-strong bg-panel-3/95 px-3 py-2 text-xs whitespace-nowrap shadow-[0_12px_30px_-10px_rgb(var(--drop)/0.9)] backdrop-blur-sm"
                 style={x(at) > 600 ? { right: `${100 - x(at) / 10}%`, marginRight: 12 } : { left: `${x(at) / 10}%`, marginLeft: 12 }}
               >
                 <div className="num mb-1 text-muted">{xs[at]} s</div>

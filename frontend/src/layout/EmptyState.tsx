@@ -108,7 +108,7 @@ function Preview({ design }: { design: Design }) {
           const [a, b] = [at.get(e.source), at.get(e.target)]
           if (!a || !b) return null
           const mx = (a.x + b.x) / 2
-          return <path key={e.id} d={`M${a.x},${a.y} C${mx},${a.y} ${mx},${b.y} ${b.x},${b.y}`} fill="none" stroke="rgb(255 255 255 / 0.18)" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
+          return <path key={e.id} d={`M${a.x},${a.y} C${mx},${a.y} ${mx},${b.y} ${b.x},${b.y}`} fill="none" stroke="rgb(var(--ink) / 0.18)" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
         })}
       </svg>
       {design.nodes.map((n) => {

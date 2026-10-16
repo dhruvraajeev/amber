@@ -1,6 +1,7 @@
-import { GitCompareArrows, Info } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { GitCompareArrows, Info, Moon, Sun } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router'
+import { save } from '../lib/storage'
 import { transition } from '../lib/transition'
 import { useStore } from '../store'
 
@@ -40,6 +41,7 @@ export default function TopBar({ children, className = '' }: { children?: ReactN
           <Info size={15} aria-hidden />
           Model
         </button>
+        <ThemeToggle />
       </nav>
       <div
         id="model-assumptions"
@@ -58,6 +60,27 @@ export default function TopBar({ children, className = '' }: { children?: ReactN
         </ul>
       </div>
     </header>
+  )
+}
+
+/** Light / dark: [data-theme] on <html> (index.html sets it before paint), remembered per device. */
+function ThemeToggle() {
+  const [light, setLight] = useState(() => document.documentElement.dataset.theme === 'light')
+  const toggle = () =>
+    transition(() => {
+      document.documentElement.dataset.theme = light ? 'dark' : 'light'
+      save('amber.theme', light ? 'dark' : 'light')
+      setLight(!light)
+    })
+  return (
+    <button
+      onClick={toggle}
+      className="btn-icon size-9 text-muted hover:text-text"
+      aria-label={light ? 'Switch to dark mode' : 'Switch to light mode'}
+      title={light ? 'Switch to dark mode' : 'Switch to light mode'}
+    >
+      {light ? <Moon size={15} aria-hidden /> : <Sun size={15} aria-hidden />}
+    </button>
   )
 }
 
