@@ -1,10 +1,11 @@
+# Base images are pinned by digest (the tag stays for readers); Dependabot proposes updates.
 # Amber in one image: the API and the built UI on one origin (plan §15.1).
 #   docker build -t amber .
 #   docker run -p 8000:8000 amber        → http://localhost:8000
 
 # Stage 1: build the UI. Only frontend/dist leaves this stage; node is not in the final image.
 # The output is plain JS/CSS, so it builds once on the build machine's own platform, never emulated.
-FROM --platform=$BUILDPLATFORM node:24-slim AS frontend
+FROM --platform=$BUILDPLATFORM node:24-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS frontend
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
@@ -14,16 +15,16 @@ RUN npm run build
 
 # Stage 2: the Python app. The layout under /app mirrors the repo, which is how the code finds
 # shared/ and frontend/dist.
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 WORKDIR /app/backend
 # Dependencies first, in their own layer, so a code change doesn't reinstall them. uv is mounted only
 # while installing, never copied in: at runtime it would be 43 MB of dead weight.
 COPY backend/pyproject.toml backend/uv.lock ./
-RUN --mount=from=ghcr.io/astral-sh/uv:0.11,source=/uv,target=/bin/uv \
+RUN --mount=from=ghcr.io/astral-sh/uv:0.11@sha256:77280f2f771df71f90786c314fe1bbc1e023feac652969bbf139c280babf2eb7,source=/uv,target=/bin/uv \
     uv sync --frozen --no-dev --no-install-project
 COPY backend/amber/ ./amber/
-RUN --mount=from=ghcr.io/astral-sh/uv:0.11,source=/uv,target=/bin/uv \
+RUN --mount=from=ghcr.io/astral-sh/uv:0.11@sha256:77280f2f771df71f90786c314fe1bbc1e023feac652969bbf139c280babf2eb7,source=/uv,target=/bin/uv \
     uv sync --frozen --no-dev
 COPY shared/ /app/shared/
 COPY --from=frontend /app/frontend/dist/ /app/frontend/dist/
