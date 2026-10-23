@@ -174,6 +174,7 @@ that `which uvx` prints: desktop apps don't always see your shell's `PATH`.
 | `get_presets` | The GPUs, models, hosted LLMs, databases, and services a design can name |
 | `validate_design` | Checks a design and lists every problem, naming the box at fault |
 | `simulate` | Runs a design: latency percentiles, errors, bottlenecks, monthly cost, and `open_url` |
+| `measure_latency` | Times real GET requests to a public endpoint the code calls, so the design uses measured latencies instead of guesses |
 
 `open_url` is a link that opens the agent's design in Amber's editor, laid out and ready to run and
 replay. The design travels inside the link's `#` fragment, which browsers never send to a server, so

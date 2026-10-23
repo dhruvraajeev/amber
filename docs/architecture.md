@@ -37,7 +37,7 @@ flowchart LR
 | `backend/amber/cli.py` | Run a design from a terminal, no UI or server needed. |
 | `frontend/src/` | React 19 + TypeScript editor: `canvas/` (React Flow), `inspector/`, `run/`, `dashboard/`, `compare/`, `store/` (Zustand), `lib/` (validation, estimates, file and link import). |
 | `frontend/src/api/generated.ts` | TypeScript types generated from the backend's OpenAPI schema. Never edited by hand. |
-| `mcp/amber_mcp/server.py` | The MCP server: four tools and one prompt, all thin wrappers over the REST API. |
+| `mcp/amber_mcp/server.py` | The MCP server: five tools and one prompt. Four wrap the REST API; `measure_latency` times real endpoints locally. |
 | `shared/` | JSON both sides read: `presets/` (GPUs, models, hosted LLMs, databases, services), `templates/` (the three starter designs), `fixtures/graph/` (validation test cases). |
 | `Dockerfile` | One image: builds the UI, then serves it and the API from one origin. |
 | `.github/workflows/` | `ci.yml` (every push), `publish.yml` (manual image push to ghcr.io), `pages.yml` (a redirect from GitHub Pages). |
@@ -106,8 +106,12 @@ ingress), so a client can't forge its way past the rate limit.
 
 ## The MCP server
 
-`mcp/` is a separate Python package that speaks MCP over stdio. It holds no simulation logic: each
-tool is one HTTP call to the public API, with the result trimmed for an agent's context window.
+`mcp/` is a separate Python package that speaks MCP over stdio. It holds no simulation logic: four tools
+are one HTTP call each to the public API, with the result trimmed for an agent's context window. The fifth,
+`measure_latency`, runs on the agent's machine and times real GET requests to an endpoint the codebase
+calls, so a design starts from measured latencies instead of guesses. It is polite by construction: GET
+only, no credentials or custom headers, one request at a time at most 5 a second, stopping at the first 429, at most 100
+samples in 60 s, and the first request (DNS and TLS) is discarded so samples look like a kept-alive service client.
 
 | Tool | Calls | Returns |
 |---|---|---|
@@ -115,6 +119,7 @@ tool is one HTTP call to the public API, with the result trimmed for an agent's 
 | `get_presets` | `GET /api/presets` | Preset ids and numbers, notes removed |
 | `validate_design` | `POST /api/validate` | `{valid, issues}` |
 | `simulate` | `POST /api/simulate` | Summary, findings, cost, and `open_url`; never the timeline |
+| `measure_latency` | GETs to the given URL, from the agent's machine | p50/p99 ready for a node's `latency`, sample count, failures |
 
 The tool descriptions carry the whole design format and a minimal example, so an agent can build a
 design without reading any docs. A 422 comes back as one readable line per issue. An unreachable API

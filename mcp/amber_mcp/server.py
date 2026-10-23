@@ -1,4 +1,5 @@
-"""Amber's MCP server (plan §13): lets an AI agent list templates, check a design, and run it.
+"""Amber's MCP server (plan §13): lets an AI agent list templates, check a design, run it, and time the real
+endpoints a design depends on, so its latencies are measured rather than guessed.
 
 Every tool is a thin wrapper over Amber's public REST API; nothing here simulates. `AMBER_API_URL` picks
 the API (default: the live deploy), which also serves the editor that `open_url` links to. The
@@ -10,9 +11,13 @@ import base64
 import json
 import logging
 import os
+import statistics
+import time
 import zlib
 from importlib.metadata import version
+from urllib.parse import urlsplit
 
+import anyio
 import httpx
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -22,6 +27,12 @@ API_URL = os.environ.get(
 ).rstrip("/")
 logging.getLogger("httpx").setLevel(logging.WARNING)  # not a log line per request on the client's stderr
 TIMEOUT_S = 60  # a run may take 20 s, plus waiting for a turn, plus a cold start from zero replicas
+
+# measure_latency: polite by construction, since it times other people's servers.
+MAX_SAMPLES = 100
+GAP_S = 0.2  # at least this long between request starts: never more than 5 requests a second to one host
+REQUEST_TIMEOUT_S = 10
+BUDGET_S = 60  # stop sampling after this long and report what was measured
 
 DESIGN_GUIDE = """
 A design is JSON: {"name": str, "version": 1, "nodes": [...], "edges": [...]}.
@@ -125,6 +136,88 @@ async def simulate(design: dict | str, duration_s: float = 60, seed: int = 42) -
     return {**trimmed, "open_url": open_url(design)}
 
 
+@server.tool()
+async def measure_latency(url: str, samples: int = 30) -> dict:
+    """Times real GET requests to one URL and returns latency ready for a node's params, so a design uses
+    measured numbers instead of guesses. Use it on the public endpoints a codebase calls (package
+    registries, public APIs, the app's own deployed read-only routes) before simulating.
+
+    GET only, never with credentials or custom headers: don't use it on endpoints that need an API key or
+    that change anything. Requests run one at a time, at most 5 a second, within 60 s, from this machine,
+    so each sample includes this machine's internet trip; a call made between servers in one cloud region
+    is faster. Returns p50/p99 in ms (the p99 is rough below 100 samples), how many requests failed, and
+    `latency` ({"p50Ms","p99Ms"}) to paste into a service, database or cache node."""
+    _check_url(url)
+    samples = max(5, min(samples, MAX_SAMPLES))
+    times_ms: list[float] = []
+    statuses: dict[str, int] = {}
+    deadline = time.monotonic() + BUDGET_S
+    # One client, so connections are kept alive like a real service's HTTP pool. The first request pays
+    # for DNS and TLS and is thrown away (warm-up), so the samples are steady-state calls.
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_S, follow_redirects=True) as client:
+        for i in range(samples + 1):
+            if time.monotonic() > deadline:
+                break
+            started = time.perf_counter()
+            try:
+                response = await client.get(url)
+                status = str(response.status_code)
+            except httpx.HTTPError as e:
+                status = type(e).__name__
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            if i:  # 0 is the warm-up
+                statuses[status] = statuses.get(status, 0) + 1
+                if status.startswith("2"):
+                    times_ms.append(elapsed_ms)
+            if status == "429":  # the server asked us to slow down: stop here, keep what was measured
+                break
+            await anyio.sleep(max(0.0, GAP_S - elapsed_ms / 1000))
+    if not times_ms:
+        raise ToolError(
+            f"No successful response from {url} ({_counts(statuses)}). Keep this latency assumed."
+        )
+    return {
+        "url": url,
+        **latency_summary(times_ms),
+        "failed": sum(statuses.values()) - len(times_ms),
+        "statuses": statuses,
+    }
+
+
+def latency_summary(times_ms: list[float]) -> dict:
+    """p50/p99 (inclusive quantiles, as the simulator computes them), min, max, and `latency` for a node."""
+    ordered = sorted(times_ms)
+    if len(ordered) > 1:
+        cuts = statistics.quantiles(ordered, n=100, method="inclusive")
+        p50, p99 = cuts[49], cuts[98]
+    else:
+        p50 = p99 = ordered[0]
+    p50, p99 = round(max(p50, 0.1), 1), round(max(p99, p50, 0.1), 1)
+    return {
+        "samples": len(ordered),
+        "p50Ms": p50,
+        "p99Ms": p99,
+        "minMs": round(ordered[0], 1),
+        "maxMs": round(ordered[-1], 1),
+        "tail": "rough: under 100 samples" if len(ordered) < 100 else "ok",
+        "latency": {"p50Ms": p50, "p99Ms": p99},
+    }
+
+
+def _check_url(url: str) -> None:
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise ToolError(
+            "measure_latency takes an http(s) URL with a host, e.g. https://registry.npmjs.org/react"
+        )
+    if parts.username or parts.password:
+        raise ToolError("Don't put credentials in the URL: measure only public endpoints.")
+
+
+def _counts(statuses: dict[str, int]) -> str:
+    return ", ".join(f"{n}× {status}" for status, n in statuses.items()) or "no responses"
+
+
 @server.prompt(
     title="Model my codebase in Amber",
     description="Read the current codebase, turn its architecture into an Amber design, and test it against "
@@ -145,14 +238,22 @@ def model_codebase(target: str = "the traffic it expects, with p99 under 500 ms"
    endpoint with its own path gets its own users node (its share of the traffic) and service node, in
    one design. Edges follow who calls whom.
    Python workers: count processes (gunicorn/uvicorn workers) as replicas, 1 concurrency each if CPU-bound.
-3. Where the code can't tell you a number (work latency, cache hit rate, calls per agent run), pick a
-   sensible value, and list every such assumption for the user.
+3. Measure before you assume. For every public endpoint the code calls (package registries, public APIs,
+   object storage, and the app's own deployed read-only routes if its URL is in the code or config), run
+   measure_latency on a representative GET URL and put its `latency` on the node that stands for that
+   call. Never measure endpoints that need an API key or that create, change or delete anything. Each
+   sample includes this machine's internet trip, so for calls between servers in one cloud region treat
+   the result as an upper bound and say so.
+   Where nothing can be measured (internal work, database queries, cache hit rates, calls per agent run),
+   pick a sensible value. Keep a table of every latency and whether it was measured (with its URL and
+   sample count) or assumed, and report "N of M latencies measured".
 4. Start from the closest list_templates design, validate_design until it is clean, then simulate.
 5. Report p50/p99, error rate, monthly cost, and the bottlenecks, each tied back to the file or setting
    it comes from. If a node is over 80% busy, say its p99 is sensitive to the latencies you assumed.
    If the target is missed, change capacity (replicas, pools, cache, batch sizes), simulate again, and
    say which change in the codebase or deploy config each fix corresponds to.
-6. End with the open_url of the final design so the user can see it in Amber's editor."""
+6. Include the measured-vs-assumed table, then end with the open_url of the final design so the user can
+   see it in Amber's editor."""
 
 
 def open_url(design: object) -> str:

@@ -1,4 +1,4 @@
-"""The four tools against a mocked API (respx): what each one sends, what it trims, and how failures read."""
+"""The five tools against a mocked API (respx): what each one sends, what it trims, and how failures read."""
 
 import base64
 import json
@@ -110,9 +110,9 @@ async def test_bad_json_string_is_a_clear_error():
         await validate_design("{nope")
 
 
-async def test_all_four_tools_are_registered():
+async def test_all_five_tools_are_registered():
     tools = {t.name: t for t in await server.server.list_tools()}
-    assert set(tools) == {"list_templates", "get_presets", "validate_design", "simulate"}
+    assert set(tools) == {"list_templates", "get_presets", "validate_design", "simulate", "measure_latency"}
     assert '"kind": "users"' in tools["simulate"].description  # the example rides with the tool
 
 
@@ -121,3 +121,71 @@ async def test_model_codebase_prompt_takes_the_target():
     assert prompt.name == "model_codebase"
     result = await server.server.get_prompt("model_codebase", {"target": "400 rps under $600/mo"})
     assert "400 rps under $600/mo" in result.messages[0].content.text
+
+
+# ── measure_latency ──────────────────────────────────────────────────────────
+
+TARGET = "https://registry.example.org/react"
+
+
+@pytest.fixture
+def no_gap(monkeypatch):
+    monkeypatch.setattr(server, "GAP_S", 0.0)
+
+
+async def test_measure_latency_discards_the_warm_up_and_counts_failures(no_gap):
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.get(TARGET).mock(
+            side_effect=[httpx.Response(200)] * 4 + [httpx.Response(503), httpx.ConnectTimeout("slow")]
+        )
+        result = await server.measure_latency(TARGET, samples=5)
+    assert route.call_count == 6  # 1 warm-up + 5 samples
+    assert result["samples"] == 3 and result["failed"] == 2
+    assert result["statuses"] == {"200": 3, "503": 1, "ConnectTimeout": 1}
+    assert result["latency"] == {"p50Ms": result["p50Ms"], "p99Ms": result["p99Ms"]}
+    assert result["tail"].startswith("rough")
+
+
+async def test_measure_latency_clamps_samples_and_reports_total_failure(no_gap):
+    with respx.mock() as mock:
+        route = mock.get(TARGET).respond(404)
+        with pytest.raises(ToolError, match="Keep this latency assumed"):
+            await server.measure_latency(TARGET, samples=10_000)
+    assert route.call_count == server.MAX_SAMPLES + 1
+
+
+@pytest.mark.parametrize(
+    "url", ["ftp://example.org/x", "registry.npmjs.org/react", "https://user:pw@example.org/x"]
+)
+async def test_measure_latency_refuses_non_http_and_credentials(url):
+    with pytest.raises(ToolError):
+        await server.measure_latency(url)
+
+
+async def test_measure_latency_stops_at_the_time_budget(no_gap, monkeypatch):
+    monkeypatch.setattr(server, "BUDGET_S", -1)  # already past the deadline
+    with respx.mock(assert_all_called=False) as mock:
+        mock.get(TARGET).respond(200)
+        with pytest.raises(ToolError, match="no responses"):
+            await server.measure_latency(TARGET)
+
+
+def test_latency_summary_is_node_ready():
+    s = server.latency_summary([float(ms) for ms in range(1, 101)])  # 1..100 ms
+    assert (s["p50Ms"], s["p99Ms"], s["minMs"], s["maxMs"]) == (50.5, 99.0, 1.0, 100.0)
+    assert s["tail"] == "ok" and s["latency"] == {"p50Ms": 50.5, "p99Ms": 99.0}
+    one = server.latency_summary([0.0])  # a near-instant reply still makes a valid p50 > 0
+    assert one["latency"] == {"p50Ms": 0.1, "p99Ms": 0.1}
+
+
+def test_the_prompt_says_measure_first_and_never_with_keys():
+    text = server.model_codebase()
+    assert "measure_latency" in text and "API key" in text and "latencies measured" in text
+
+
+async def test_measure_latency_stops_at_the_first_429(no_gap):
+    with respx.mock() as mock:
+        route = mock.get(TARGET).mock(side_effect=[httpx.Response(200)] * 3 + [httpx.Response(429)] * 50)
+        result = await server.measure_latency(TARGET, samples=30)
+    assert route.call_count == 4  # warm-up, 2 samples, then the 429 ends it
+    assert result["statuses"] == {"200": 2, "429": 1} and result["samples"] == 2
