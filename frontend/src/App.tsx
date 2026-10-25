@@ -28,8 +28,12 @@ export default function App() {
       if (!hash.startsWith('#d=')) return
       history.replaceState(null, '', window.location.pathname) // a refresh keeps edits, not the link's copy
       void designFromHash(hash).then((d) => {
-        if (d) return useStore.getState().loadDesign(d)
-        setNotice('That link doesn’t hold a readable design. It may have been cut short when it was copied.')
+        if (d && d !== 'tooLarge') return useStore.getState().loadDesign(d)
+        setNotice(
+          d === 'tooLarge'
+            ? 'This link is too large to open.'
+            : 'That link doesn’t hold a readable design. It may have been cut short when it was copied.',
+        )
         useStore.getState().setHome(true) // the notice lives on the landing page
       })
     }

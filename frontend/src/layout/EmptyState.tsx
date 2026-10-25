@@ -1,6 +1,6 @@
 import { ArrowRight, ArrowUpRight, FileUp, Plus } from 'lucide-react'
 import { BLANK, KINDS } from '../canvas/map'
-import { parseDesign } from '../lib/designFile'
+import { MAX_DESIGN_BYTES, parseDesign } from '../lib/designFile'
 import type { Design } from '../api/api'
 import Embers from './Embers'
 
@@ -72,6 +72,7 @@ export default function EmptyState({ templates, offline, resume, notice, onPick,
                   const file = e.target.files?.[0]
                   e.target.value = '' // picking the same file again still fires
                   if (!file) return
+                  if (file.size > MAX_DESIGN_BYTES) return onNotice(`${file.name} is too large to be an Amber design.`)
                   const d = parseDesign(await file.text())
                   if (d) onPick(d)
                   else onNotice(`${file.name} isn’t an Amber design (JSON with "version": 1, "nodes" and "edges").`)

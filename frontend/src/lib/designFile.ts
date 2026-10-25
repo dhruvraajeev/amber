@@ -21,15 +21,31 @@ export function isDesign(d: unknown): d is Design {
   return o?.version === 1 && Array.isArray(o.nodes) && Array.isArray(o.edges)
 }
 
-/** `#d=<base64url of deflate-raw JSON>` → the design, or null when the fragment is missing or broken.
+/** The most bytes a design file or link may hold once decompressed. A 50-node design is a few KB, so this
+ * is far above any real one, and low enough that a tiny link inflating to gigabytes (a zip bomb) is cut off. */
+export const MAX_DESIGN_BYTES = 1_000_000
+
+/** `#d=<base64url of deflate-raw JSON>` → the design; `'tooLarge'` when it inflates past MAX_DESIGN_BYTES
+ * (reading stops there); null when the fragment is missing or broken.
  * mcp/amber_mcp/server.py `open_url` writes this format; keep the two in step. */
-export async function designFromHash(hash: string): Promise<Design | null> {
+export async function designFromHash(hash: string): Promise<Design | 'tooLarge' | null> {
   if (!hash.startsWith('#d=')) return null
   try {
     const b64 = hash.slice(3).replace(/-/g, '+').replace(/_/g, '/')
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
-    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
-    return parseDesign(await new Response(stream).text())
+    const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader()
+    const decoder = new TextDecoder()
+    let text = ''
+    let size = 0
+    for (let r = await reader.read(); !r.done; r = await reader.read()) {
+      size += r.value.byteLength
+      if (size > MAX_DESIGN_BYTES) {
+        reader.cancel().catch(() => {}) // stop inflating; nothing more is read
+        return 'tooLarge'
+      }
+      text += decoder.decode(r.value, { stream: true })
+    }
+    return parseDesign(text + decoder.decode())
   } catch {
     return null
   }
