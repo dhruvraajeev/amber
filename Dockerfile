@@ -15,7 +15,7 @@ RUN npm run build
 
 # Stage 2: the Python app. The layout under /app mirrors the repo, which is how the code finds
 # shared/ and frontend/dist.
-FROM python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 WORKDIR /app/backend
 # Dependencies first, in their own layer, so a code change doesn't reinstall them. uv is mounted only
