@@ -5,7 +5,7 @@
 
 # Stage 1: build the UI. Only frontend/dist leaves this stage; node is not in the final image.
 # The output is plain JS/CSS, so it builds once on the build machine's own platform, never emulated.
-FROM --platform=$BUILDPLATFORM node:24-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS frontend
+FROM --platform=$BUILDPLATFORM node:26-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS frontend
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
